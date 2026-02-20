@@ -6,6 +6,7 @@ import type { SpotifyRecentlyPlayedResponse, SpotifyUserProfile } from '../types
 
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
 const REFRESH_BUFFER_MS = 60 * 1000; // refresh if within 60 seconds of expiry
+const REQUEST_TIMEOUT_MS = 10_000;
 
 async function getValidToken(token: OAuthToken): Promise<string> {
   const now = Date.now();
@@ -49,6 +50,7 @@ export async function fetchRecentlyPlayed(
     {
       headers: { Authorization: `Bearer ${accessToken}` },
       params,
+      timeout: REQUEST_TIMEOUT_MS,
     },
   );
 
@@ -58,6 +60,7 @@ export async function fetchRecentlyPlayed(
 export async function fetchUserProfile(accessToken: string): Promise<SpotifyUserProfile> {
   const response = await axios.get<SpotifyUserProfile>(`${SPOTIFY_API_BASE}/me`, {
     headers: { Authorization: `Bearer ${accessToken}` },
+    timeout: REQUEST_TIMEOUT_MS,
   });
   return response.data;
 }

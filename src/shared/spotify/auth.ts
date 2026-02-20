@@ -3,6 +3,7 @@ import { config } from '../config';
 import type { SpotifyTokenResponse } from '../types';
 
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';
+const REQUEST_TIMEOUT_MS = 10_000;
 
 function basicAuthHeader(): string {
   const credentials = `${config.spotifyClientId}:${config.spotifyClientSecret}`;
@@ -27,6 +28,7 @@ export async function exchangeCode(code: string, redirectUri: string): Promise<T
       Authorization: basicAuthHeader(),
       'Content-Type': 'application/x-www-form-urlencoded',
     },
+    timeout: REQUEST_TIMEOUT_MS,
   });
 
   const data = response.data;
@@ -52,6 +54,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenSet
       Authorization: basicAuthHeader(),
       'Content-Type': 'application/x-www-form-urlencoded',
     },
+    timeout: REQUEST_TIMEOUT_MS,
   });
 
   const data = response.data;

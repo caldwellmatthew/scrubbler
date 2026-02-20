@@ -2,6 +2,7 @@ import * as tokenRepo from '../shared/repositories/tokenRepo';
 import * as trackRepo from '../shared/repositories/trackRepo';
 import * as historyRepo from '../shared/repositories/historyRepo';
 import { fetchRecentlyPlayed } from '../shared/spotify/client';
+import { getPool } from '../shared/db';
 import type { ListenEvent, Track } from '../shared/types';
 import type { SpotifyPlayHistoryItem } from '../shared/types';
 
@@ -56,23 +57,30 @@ export async function poll(): Promise<void> {
 
   if (items.length === 0) {
     console.log('[worker] No new tracks since last poll');
-    // Still update last_polled_at even when there's nothing new
-    if (cursor !== null) {
-      await historyRepo.updatePollState(cursor);
-    }
+    await historyRepo.updatePollState(null); // stamps last_polled_at, preserves cursor
     return;
   }
 
-  // 4. Upsert track metadata
+  // 4+5. Upsert tracks and insert events in a single transaction
   const tracks = items.map(itemToTrack);
-  await trackRepo.upsertMany(tracks);
-
-  // 5. Insert listen events (idempotent via ON CONFLICT DO NOTHING)
   const events = items.map((item) => itemToListenEvent(item, token.spotifyUserId));
-  const inserted = await historyRepo.insertMany(events);
-
-  // 6. Advance cursor to the most recent played_at (items are newest-first)
   const newestMs = new Date(items[0].played_at).getTime();
+
+  const client = await getPool().connect();
+  let inserted = 0;
+  try {
+    await client.query('BEGIN');
+    await trackRepo.upsertMany(tracks, client);
+    inserted = await historyRepo.insertMany(events, client);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  // 6. Advance cursor only after successful commit
   await historyRepo.updatePollState(newestMs);
 
   console.log(

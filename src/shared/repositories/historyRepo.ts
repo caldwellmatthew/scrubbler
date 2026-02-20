@@ -1,10 +1,14 @@
 import { getPool } from '../db';
+import type { PoolClient } from 'pg';
 import type { HistoryQueryParams, ListenEvent, ListenHistoryRow, PollState } from '../types';
 
 export async function getPollState(): Promise<PollState> {
   const pool = getPool();
   const result = await pool.query('SELECT * FROM poll_state WHERE id = 1');
   const row = result.rows[0];
+  if (!row) {
+    throw new Error('poll_state seed row missing — re-run migrations');
+  }
   return {
     id: 1,
     lastPlayedAtMs: row.last_played_at_ms as number | null,
@@ -23,20 +27,20 @@ export async function setPollEnabled(enabled: boolean): Promise<void> {
   await pool.query('UPDATE poll_state SET poll_enabled = $1 WHERE id = 1', [enabled]);
 }
 
-export async function updatePollState(lastPlayedAtMs: number): Promise<void> {
+export async function updatePollState(lastPlayedAtMs: number | null): Promise<void> {
   const pool = getPool();
   await pool.query(
     `UPDATE poll_state
-     SET last_played_at_ms = $1, last_polled_at = NOW()
+     SET last_played_at_ms = COALESCE($1, last_played_at_ms), last_polled_at = NOW()
      WHERE id = 1`,
     [lastPlayedAtMs],
   );
 }
 
-export async function insertMany(events: ListenEvent[]): Promise<number> {
+export async function insertMany(events: ListenEvent[], client?: PoolClient): Promise<number> {
   if (events.length === 0) return 0;
 
-  const pool = getPool();
+  const pool = client ?? getPool();
 
   const values: unknown[] = [];
   const placeholders = events.map((event, i) => {

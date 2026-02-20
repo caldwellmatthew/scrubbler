@@ -20,6 +20,5 @@ export const config = {
   databaseUrl: requireEnv('DATABASE_URL'),
   port: parseInt(optionalEnv('PORT', '3000'), 10),
   pollIntervalMs: parseInt(optionalEnv('POLL_INTERVAL_MS', '60000'), 10),
-  oauthStateSecret: requireEnv('OAUTH_STATE_SECRET'),
   nodeEnv: optionalEnv('NODE_ENV', 'development'),
 } as const;

@@ -1,10 +1,11 @@
 import { getPool } from '../db';
+import type { PoolClient } from 'pg';
 import type { Track } from '../types';
 
-export async function upsertMany(tracks: Track[]): Promise<void> {
+export async function upsertMany(tracks: Track[], client?: PoolClient): Promise<void> {
   if (tracks.length === 0) return;
 
-  const pool = getPool();
+  const pool = client ?? getPool();
 
   // Deduplicate by track ID — the same track can appear multiple times in a
   // recently-played response, and Postgres rejects an ON CONFLICT DO UPDATE

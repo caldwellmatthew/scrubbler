@@ -40,7 +40,6 @@ open http://localhost:3000/auth/login
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `PORT` | No | HTTP server port (default: `3000`) |
 | `POLL_INTERVAL_MS` | No | Polling interval in ms (default: `60000`) |
-| `OAUTH_STATE_SECRET` | Yes | Random secret for CSRF state validation |
 | `NODE_ENV` | No | `development` or `production` |
 
 ## API Endpoints
