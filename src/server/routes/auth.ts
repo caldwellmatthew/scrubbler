@@ -40,6 +40,33 @@ setInterval(() => {
 const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
 const SCOPES = ['user-read-recently-played', 'user-read-private', 'user-read-email'].join(' ');
 
+authRouter.get('/status', async (_req, res, next) => {
+  try {
+    const token = await tokenRepo.getFirst();
+    if (token) {
+      res.json({
+        authenticated: true,
+        displayName: token.displayName,
+        spotifyUserId: token.spotifyUserId,
+      });
+    } else {
+      res.json({ authenticated: false });
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
+authRouter.post('/logout', async (_req, res, next) => {
+  try {
+    await tokenRepo.deleteAll();
+    console.log('[auth] User logged out');
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 authRouter.get('/login', (req, res) => {
   const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`;
   const state = generateState(redirectUri);
@@ -82,6 +109,7 @@ authRouter.get('/callback', async (req, res, next) => {
 
     await tokenRepo.upsertToken(
       profile.id,
+      profile.display_name ?? null,
       tokenSet.accessToken,
       tokenSet.refreshToken,
       tokenSet.expiresAt,
@@ -89,11 +117,7 @@ authRouter.get('/callback', async (req, res, next) => {
 
     console.log(`[auth] Successfully authenticated Spotify user: ${profile.id}`);
 
-    res.json({
-      ok: true,
-      spotifyUserId: profile.id,
-      message: 'Authentication successful. The polling worker will begin fetching your history.',
-    });
+    res.redirect('/');
   } catch (err) {
     next(err);
   }

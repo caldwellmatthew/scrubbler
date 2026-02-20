@@ -32,17 +32,24 @@ function itemToListenEvent(item: SpotifyPlayHistoryItem, spotifyUserId: string):
 }
 
 export async function poll(): Promise<void> {
-  // 1. Load token — bail if user hasn't authenticated yet
+  // 1. Check poll_enabled flag
+  const pollState = await historyRepo.getPollState();
+  if (!pollState.pollEnabled) {
+    console.log('[worker] Polling is disabled — skipping');
+    return;
+  }
+
+  // 2. Load token — bail if user hasn't authenticated yet
   const token = await tokenRepo.getFirst();
   if (!token) {
     console.log('[worker] No OAuth token found — waiting for user to authenticate via /auth/login');
     return;
   }
 
-  // 2. Get cursor from poll_state
-  const cursor = await historyRepo.getLastPlayedAtMs();
+  // 3. Get cursor from poll_state (already fetched above)
+  const cursor = pollState.lastPlayedAtMs;
 
-  // 3. Fetch from Spotify
+  // 4. Fetch from Spotify
   console.log(`[worker] Polling recently-played (after=${cursor ?? 'beginning'})`);
   const response = await fetchRecentlyPlayed(token, cursor);
   const items = response.items;

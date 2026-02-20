@@ -5,6 +5,7 @@ function rowToToken(row: Record<string, unknown>): OAuthToken {
   return {
     id: row.id as number,
     spotifyUserId: row.spotify_user_id as string,
+    displayName: row.display_name as string | null,
     accessToken: row.access_token as string,
     refreshToken: row.refresh_token as string,
     expiresAt: row.expires_at as Date,
@@ -15,21 +16,23 @@ function rowToToken(row: Record<string, unknown>): OAuthToken {
 
 export async function upsertToken(
   spotifyUserId: string,
+  displayName: string | null,
   accessToken: string,
   refreshToken: string,
   expiresAt: Date,
 ): Promise<OAuthToken> {
   const pool = getPool();
   const result = await pool.query(
-    `INSERT INTO oauth_tokens (spotify_user_id, access_token, refresh_token, expires_at, updated_at)
-     VALUES ($1, $2, $3, $4, NOW())
+    `INSERT INTO oauth_tokens (spotify_user_id, display_name, access_token, refresh_token, expires_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, NOW())
      ON CONFLICT (spotify_user_id) DO UPDATE SET
+       display_name  = EXCLUDED.display_name,
        access_token  = EXCLUDED.access_token,
        refresh_token = EXCLUDED.refresh_token,
        expires_at    = EXCLUDED.expires_at,
        updated_at    = NOW()
      RETURNING *`,
-    [spotifyUserId, accessToken, refreshToken, expiresAt],
+    [spotifyUserId, displayName, accessToken, refreshToken, expiresAt],
   );
   return rowToToken(result.rows[0]);
 }
@@ -38,6 +41,11 @@ export async function getFirst(): Promise<OAuthToken | null> {
   const pool = getPool();
   const result = await pool.query('SELECT * FROM oauth_tokens LIMIT 1');
   return result.rows.length > 0 ? rowToToken(result.rows[0]) : null;
+}
+
+export async function deleteAll(): Promise<void> {
+  const pool = getPool();
+  await pool.query('DELETE FROM oauth_tokens');
 }
 
 export async function updateTokens(

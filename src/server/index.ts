@@ -2,6 +2,8 @@ import express from 'express';
 import { config } from '../shared/config';
 import { authRouter } from './routes/auth';
 import { historyRouter } from './routes/history';
+import { pollRouter } from './routes/poll';
+import { uiRouter } from './routes/ui';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -14,8 +16,10 @@ app.get('/health', (_req, res) => {
 });
 
 // Routes
+app.use('/', uiRouter);
 app.use('/auth', authRouter);
 app.use('/history', historyRouter);
+app.use('/poll', pollRouter);
 
 // 404 handler
 app.use((_req, res) => {

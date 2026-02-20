@@ -1,10 +1,26 @@
 import { getPool } from '../db';
-import type { HistoryQueryParams, ListenEvent, ListenHistoryRow } from '../types';
+import type { HistoryQueryParams, ListenEvent, ListenHistoryRow, PollState } from '../types';
+
+export async function getPollState(): Promise<PollState> {
+  const pool = getPool();
+  const result = await pool.query('SELECT * FROM poll_state WHERE id = 1');
+  const row = result.rows[0];
+  return {
+    id: 1,
+    lastPlayedAtMs: row.last_played_at_ms as number | null,
+    lastPolledAt: row.last_polled_at as Date | null,
+    pollEnabled: row.poll_enabled as boolean,
+  };
+}
 
 export async function getLastPlayedAtMs(): Promise<number | null> {
+  const state = await getPollState();
+  return state.lastPlayedAtMs;
+}
+
+export async function setPollEnabled(enabled: boolean): Promise<void> {
   const pool = getPool();
-  const result = await pool.query('SELECT last_played_at_ms FROM poll_state WHERE id = 1');
-  return result.rows[0]?.last_played_at_ms ?? null;
+  await pool.query('UPDATE poll_state SET poll_enabled = $1 WHERE id = 1', [enabled]);
 }
 
 export async function updatePollState(lastPlayedAtMs: number): Promise<void> {

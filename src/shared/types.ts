@@ -3,6 +3,7 @@
 export interface OAuthToken {
   id: number;
   spotifyUserId: string;
+  displayName: string | null;
   accessToken: string;
   refreshToken: string;
   expiresAt: Date;
@@ -43,6 +44,7 @@ export interface PollState {
   id: 1;
   lastPlayedAtMs: number | null;
   lastPolledAt: Date | null;
+  pollEnabled: boolean;
 }
 
 // ─── Spotify API response types ───────────────────────────────────────────────
