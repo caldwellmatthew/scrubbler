@@ -26,7 +26,7 @@ const HTML = /* html */ `<!DOCTYPE html>
       display: flex;
       align-items: center;
       gap: 1rem;
-      margin-bottom: 2rem;
+      margin-bottom: 1.5rem;
       flex-wrap: wrap;
     }
     h1 { font-size: 1.25rem; font-weight: 600; color: #fff; }
@@ -57,6 +57,29 @@ const HTML = /* html */ `<!DOCTYPE html>
     .user-id { font-size: 0.75rem; color: #555; }
     .spacer { margin-left: auto; }
     .meta { font-size: 0.75rem; color: #555; }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid #2a2a2a;
+      margin-bottom: 1.5rem;
+    }
+    .tab {
+      padding: 0.5rem 1.1rem;
+      cursor: pointer;
+      color: #666;
+      font-size: 0.85rem;
+      border: none;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+      background: transparent;
+      margin-bottom: -1px;
+    }
+    .tab:hover { color: #aaa; background: transparent; }
+    .tab.active { color: #fff; border-bottom-color: #1db954; }
+
+    /* ── History tab ── */
     table { width: 100%; border-collapse: collapse; }
     th {
       text-align: left;
@@ -87,6 +110,70 @@ const HTML = /* html */ `<!DOCTYPE html>
     #load-more:hover:not(:disabled) { background: #222; color: #ccc; }
     #load-more:disabled { opacity: 0.35; cursor: default; }
     #empty { text-align: center; padding: 4rem 0; color: #444; }
+
+    /* ── Explorer tab ── */
+    .explorer-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: stretch;
+      margin-bottom: 1rem;
+    }
+    .explorer-row input {
+      flex: 1;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 6px;
+      color: #e0e0e0;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.9rem;
+      font-family: monospace;
+    }
+    .explorer-row input:focus { outline: none; border-color: #555; }
+    #send-btn { white-space: nowrap; }
+    .presets {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .preset {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      color: #888;
+      font-family: monospace;
+    }
+    .preset:hover { background: #222; color: #ccc; border-color: #444; }
+    .response-meta {
+      font-size: 0.75rem;
+      color: #555;
+      margin-bottom: 0.5rem;
+    }
+    .response-meta .status-ok  { color: #1db954; }
+    .response-meta .status-err { color: #e05c5c; }
+    #response-output {
+      background: #0d0d0d;
+      border: 1px solid #222;
+      border-radius: 6px;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      color: #ccc;
+      white-space: pre;
+      overflow: auto;
+      max-height: 60vh;
+      min-height: 6rem;
+    }
+    #response-output::-webkit-scrollbar { width: 8px; height: 8px; }
+    #response-output::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 4px; }
+    #response-output::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+    #response-output::-webkit-scrollbar-thumb:hover { background: #555; }
+
+    /* ── Shared ── */
     #unauthenticated {
       text-align: center;
       padding: 5rem 0;
@@ -124,20 +211,42 @@ const HTML = /* html */ `<!DOCTYPE html>
   </div>
 
   <div id="authenticated-content" class="hidden">
-    <table>
-      <thead>
-        <tr>
-          <th>Played at</th>
-          <th>Track</th>
-          <th>Artist</th>
-          <th>Album</th>
-          <th>Duration</th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
-    <p id="empty" style="display:none">No history yet — wait for the first poll.</p>
-    <button id="load-more" disabled>Load more</button>
+    <div class="tabs">
+      <button class="tab active" data-tab="history">History</button>
+      <button class="tab" data-tab="explorer">API Explorer</button>
+    </div>
+
+    <!-- History tab -->
+    <div id="tab-history">
+      <table>
+        <thead>
+          <tr>
+            <th>Played at</th>
+            <th>Track</th>
+            <th>Artist</th>
+            <th>Album</th>
+            <th>Duration</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <p id="empty" style="display:none">No history yet — wait for the first poll.</p>
+      <button id="load-more" disabled>Load more</button>
+    </div>
+
+    <!-- Explorer tab -->
+    <div id="tab-explorer" class="hidden">
+      <div class="explorer-row">
+        <input id="endpoint-input" type="text" placeholder="/me/player/recently-played?limit=50" value="/me/player/recently-played?limit=50" spellcheck="false" />
+        <button id="send-btn">Send</button>
+      </div>
+      <div class="presets">
+        <span class="preset" data-endpoint="/me">/me</span>
+        <span class="preset" data-endpoint="/me/player/recently-played?limit=50">/me/player/recently-played?limit=50</span>
+      </div>
+      <div class="response-meta" id="response-meta"></div>
+      <pre id="response-output">Hit Send to make a request.</pre>
+    </div>
   </div>
 
   <script>
@@ -148,6 +257,17 @@ const HTML = /* html */ `<!DOCTYPE html>
 
     function show(id) { document.getElementById(id).classList.remove('hidden'); }
     function hide(id) { document.getElementById(id).classList.add('hidden'); }
+
+    // ── Tabs ────────────────────────────────────────────────────
+    document.querySelectorAll('.tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.dataset.tab;
+        document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('hidden'));
+        document.getElementById('tab-' + tab).classList.remove('hidden');
+      });
+    });
 
     // ── Auth ────────────────────────────────────────────────────
     async function refreshAuthState() {
@@ -236,6 +356,46 @@ const HTML = /* html */ `<!DOCTYPE html>
     }
 
     document.getElementById('load-more').addEventListener('click', () => loadHistory(false));
+
+    // ── Explorer ─────────────────────────────────────────────────
+    async function sendRequest() {
+      const raw = document.getElementById('endpoint-input').value.trim();
+      if (!raw) return;
+
+      // Split path and inline query params, e.g. /me/top/tracks?limit=5
+      const [path, inlineQuery] = raw.split('?');
+      const params = new URLSearchParams(inlineQuery || '');
+      params.set('endpoint', path);
+
+      document.getElementById('response-output').textContent = 'Loading…';
+      document.getElementById('response-meta').textContent = '';
+
+      const res = await fetch('/explorer/proxy?' + params.toString());
+      const json = await res.json();
+
+      const meta = document.getElementById('response-meta');
+      const statusClass = json.status >= 200 && json.status < 300 ? 'status-ok' : 'status-err';
+      meta.innerHTML = 'HTTP <span class="' + statusClass + '">' + json.status + '</span>';
+
+      document.getElementById('response-output').textContent = JSON.stringify(json.data, null, 2);
+    }
+
+    document.getElementById('send-btn').addEventListener('click', sendRequest);
+    document.getElementById('endpoint-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') sendRequest();
+    });
+
+    document.querySelectorAll('.preset').forEach(el => {
+      el.addEventListener('click', () => {
+        document.getElementById('endpoint-input').value = el.dataset.endpoint;
+        sendRequest();
+        // Switch to explorer tab if not already there
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelector('[data-tab="explorer"]').classList.add('active');
+        document.querySelectorAll('[id^="tab-"]').forEach(e => e.classList.add('hidden'));
+        document.getElementById('tab-explorer').classList.remove('hidden');
+      });
+    });
 
     // ── Init ────────────────────────────────────────────────────
     async function init() {
