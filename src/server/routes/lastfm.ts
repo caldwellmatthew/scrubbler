@@ -87,7 +87,7 @@ lastfmRouter.post('/scrobble', async (req, res, next) => {
     }
     const rows = await historyRepo.getByIds(ids);
     const items: lastfmClient.ScrobbleItem[] = rows.map((row) => ({
-      artist: row.artistName,
+      artist: row.artistName.split(', ')[0],
       track: row.name,
       album: row.albumName,
       timestamp: Math.floor(row.playedAt.getTime() / 1000),
