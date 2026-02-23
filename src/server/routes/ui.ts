@@ -142,6 +142,13 @@ const HTML = /* html */ `<!DOCTYPE html>
       background: #111;
       padding: 0.6rem 0;
       border-bottom: 1px solid #2a2a2a;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    #scrobble-bar.visible {
+      visibility: visible;
+      opacity: 1;
     }
     #scrobble-btn { border-color: #d51007; color: #e0323f; }
     #scrobble-btn:hover { background: #d5100715; }
@@ -257,7 +264,7 @@ const HTML = /* html */ `<!DOCTYPE html>
 
     <!-- History tab -->
     <div id="tab-history">
-      <div id="scrobble-bar" class="hidden">
+      <div id="scrobble-bar">
         <span id="scrobble-count">0 selected</span>
         <button id="scrobble-btn">Scrobble to Last.fm</button>
         <button id="scrobble-clear-btn">Clear</button>
@@ -395,11 +402,12 @@ const HTML = /* html */ `<!DOCTYPE html>
 
     function updateScrobbleBar() {
       if (!lastfmEnabled) return;
+      const bar = document.getElementById('scrobble-bar');
       if (selectedIds.size > 0) {
         document.getElementById('scrobble-count').textContent = selectedIds.size + ' selected';
-        show('scrobble-bar');
+        bar.classList.add('visible');
       } else {
-        hide('scrobble-bar');
+        bar.classList.remove('visible');
       }
     }
 
