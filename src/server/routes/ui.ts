@@ -136,6 +136,12 @@ const HTML = /* html */ `<!DOCTYPE html>
       margin-bottom: 0.75rem;
       font-size: 0.85rem;
       color: #aaa;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: #111;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid #2a2a2a;
     }
     #scrobble-btn { border-color: #d51007; color: #e0323f; }
     #scrobble-btn:hover { background: #d5100715; }
