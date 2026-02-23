@@ -4,6 +4,7 @@ import { authRouter } from './routes/auth';
 import { historyRouter } from './routes/history';
 import { pollRouter } from './routes/poll';
 import { explorerRouter } from './routes/explorer';
+import { lastfmRouter } from './routes/lastfm';
 import { uiRouter } from './routes/ui';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -22,6 +23,7 @@ app.use('/auth', authRouter);
 app.use('/history', historyRouter);
 app.use('/poll', pollRouter);
 app.use('/explorer', explorerRouter);
+app.use('/lastfm', lastfmRouter);
 
 // 404 handler
 app.use((_req, res) => {

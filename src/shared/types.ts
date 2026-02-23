@@ -38,6 +38,14 @@ export interface ListenHistoryRow extends ListenEvent {
   externalUrl: string | null;
   previewUrl: string | null;
   imageUrl: string | null;
+  scrobbledAt: Date | null;
+}
+
+export interface LastfmSession {
+  id: number;
+  username: string;
+  sessionKey: string;
+  createdAt: Date;
 }
 
 export interface PollState {

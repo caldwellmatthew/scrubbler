@@ -45,6 +45,7 @@ historyRouter.get('/', async (req, res, next) => {
       items: rows.map((row) => ({
         id: row.id,
         playedAt: row.playedAt,
+        scrobbledAt: row.scrobbledAt,
         spotifyUserId: row.spotifyUserId,
         track: {
           spotifyTrackId: row.spotifyTrackId,

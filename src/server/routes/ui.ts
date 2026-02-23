@@ -54,6 +54,9 @@ const HTML = /* html */ `<!DOCTYPE html>
     #login-btn { border-color: #1db954; color: #1db954; }
     #login-btn:hover { background: #1db95415; }
     #logout-btn { border-color: #555; color: #888; }
+    #lastfm-connect-btn { border-color: #d51007; color: #e0323f; }
+    #lastfm-connect-btn:hover { background: #d5100715; }
+    #lastfm-disconnect-btn { border-color: #555; color: #888; }
     .user-id { font-size: 0.75rem; color: #555; }
     .spacer { margin-left: auto; }
     .meta { font-size: 0.75rem; color: #555; }
@@ -110,6 +113,30 @@ const HTML = /* html */ `<!DOCTYPE html>
     #load-more:hover:not(:disabled) { background: #222; color: #ccc; }
     #load-more:disabled { opacity: 0.35; cursor: default; }
     #empty { text-align: center; padding: 4rem 0; color: #444; }
+
+    /* ── Check column ── */
+    .check-col { width: 2.5rem; }
+    th.check-col, td.check-cell {
+      text-align: center;
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+    }
+    td.check-cell { color: #1db954; font-size: 0.9rem; }
+    tr.scrobbled td { opacity: 0.45; }
+    tr.scrobbled td.check-cell { opacity: 1; }
+
+    /* ── Scrobble action bar ── */
+    #scrobble-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.85rem;
+      color: #aaa;
+    }
+    #scrobble-btn { border-color: #d51007; color: #e0323f; }
+    #scrobble-btn:hover { background: #d5100715; }
+    #scrobble-clear-btn { border-color: #444; color: #888; }
 
     /* ── Explorer tab ── */
     .explorer-row {
@@ -200,6 +227,9 @@ const HTML = /* html */ `<!DOCTYPE html>
     <button id="toggle-btn" class="hidden">...</button>
     <span class="spacer"></span>
     <span class="meta" id="last-polled"></span>
+    <span class="meta" id="lastfm-username" class="hidden"></span>
+    <button id="lastfm-disconnect-btn" class="hidden">Disconnect Last.fm</button>
+    <a href="/lastfm/login" id="lastfm-connect-btn" class="btn hidden">Connect Last.fm</a>
     <span class="user-id" id="user-id"></span>
     <button id="logout-btn" class="hidden">Log out</button>
     <a href="/auth/login" id="login-btn" class="btn hidden">Connect Spotify</a>
@@ -218,9 +248,15 @@ const HTML = /* html */ `<!DOCTYPE html>
 
     <!-- History tab -->
     <div id="tab-history">
+      <div id="scrobble-bar" class="hidden">
+        <span id="scrobble-count">0 selected</span>
+        <button id="scrobble-btn">Scrobble to Last.fm</button>
+        <button id="scrobble-clear-btn">Clear</button>
+      </div>
       <table>
         <thead>
           <tr>
+            <th class="check-col"><input type="checkbox" id="select-all" /></th>
             <th>Played at</th>
             <th>Track</th>
             <th>Artist</th>
@@ -254,6 +290,9 @@ const HTML = /* html */ `<!DOCTYPE html>
     let offset = 0;
     let polling = false;
     let authenticated = false;
+    let selectedIds = new Set();
+    let lastfmEnabled = false;
+    let lastfmConnected = false;
 
     function show(id) { document.getElementById(id).classList.remove('hidden'); }
     function hide(id) { document.getElementById(id).classList.add('hidden'); }
@@ -300,6 +339,29 @@ const HTML = /* html */ `<!DOCTYPE html>
       offset = 0;
     });
 
+    // ── Last.fm ─────────────────────────────────────────────────
+    async function refreshLastfmState() {
+      const status = await fetch('/lastfm/status').then(r => r.json());
+      lastfmEnabled = status.enabled;
+      lastfmConnected = status.connected;
+      if (!lastfmEnabled) return;
+      if (lastfmConnected) {
+        document.getElementById('lastfm-username').textContent = status.username;
+        show('lastfm-username');
+        show('lastfm-disconnect-btn');
+        hide('lastfm-connect-btn');
+      } else {
+        hide('lastfm-username');
+        hide('lastfm-disconnect-btn');
+        show('lastfm-connect-btn');
+      }
+    }
+
+    document.getElementById('lastfm-disconnect-btn').addEventListener('click', async () => {
+      await fetch('/lastfm/disconnect', { method: 'POST' });
+      await refreshLastfmState();
+    });
+
     // ── Poll state ──────────────────────────────────────────────
     async function refreshPollState() {
       if (!authenticated) return;
@@ -317,6 +379,76 @@ const HTML = /* html */ `<!DOCTYPE html>
       const action = polling ? 'stop' : 'start';
       await fetch('/poll/' + action, { method: 'POST' });
       await refreshPollState();
+    });
+
+    // ── Scrobble bar ─────────────────────────────────────────────
+    function updateScrobbleBar() {
+      if (!lastfmEnabled) return;
+      if (selectedIds.size > 0) {
+        document.getElementById('scrobble-count').textContent = selectedIds.size + ' selected';
+        show('scrobble-bar');
+      } else {
+        hide('scrobble-bar');
+      }
+    }
+
+    document.getElementById('select-all').addEventListener('change', e => {
+      const checked = e.target.checked;
+      document.querySelectorAll('.row-check').forEach(cb => {
+        cb.checked = checked;
+        const id = parseInt(cb.dataset.id);
+        if (checked) selectedIds.add(id);
+        else selectedIds.delete(id);
+      });
+      updateScrobbleBar();
+    });
+
+    document.getElementById('tbody').addEventListener('change', e => {
+      const cb = e.target;
+      if (!cb.matches('.row-check')) return;
+      const id = parseInt(cb.dataset.id);
+      if (cb.checked) selectedIds.add(id);
+      else selectedIds.delete(id);
+      updateScrobbleBar();
+    });
+
+    document.getElementById('scrobble-btn').addEventListener('click', async () => {
+      const ids = [...selectedIds];
+      let result;
+      try {
+        result = await fetch('/lastfm/scrobble', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids }),
+        }).then(r => r.json());
+      } catch (err) {
+        alert('Scrobble failed: ' + err.message);
+        return;
+      }
+      if (!result.ok) {
+        alert('Scrobble failed: ' + (result.error || 'Unknown error'));
+        return;
+      }
+      // Mark rows as scrobbled in the UI
+      for (const id of ids) {
+        const cb = document.querySelector('.row-check[data-id="' + id + '"]');
+        if (!cb) continue;
+        const tr = cb.closest('tr');
+        const td = cb.closest('td');
+        tr.classList.add('scrobbled');
+        td.innerHTML = '✓';
+        td.className = 'check-cell';
+      }
+      selectedIds.clear();
+      document.getElementById('select-all').checked = false;
+      updateScrobbleBar();
+    });
+
+    document.getElementById('scrobble-clear-btn').addEventListener('click', () => {
+      selectedIds.clear();
+      document.querySelectorAll('.row-check').forEach(cb => { cb.checked = false; });
+      document.getElementById('select-all').checked = false;
+      updateScrobbleBar();
     });
 
     // ── History ─────────────────────────────────────────────────
@@ -337,12 +469,25 @@ const HTML = /* html */ `<!DOCTYPE html>
       if (reset) {
         offset = 0;
         document.getElementById('tbody').innerHTML = '';
+        selectedIds.clear();
+        updateScrobbleBar();
       }
       const data = await fetch('/history?limit=' + LIMIT + '&offset=' + offset).then(r => r.json());
       const tbody = document.getElementById('tbody');
       for (const item of data.items) {
         const tr = document.createElement('tr');
+        tr.dataset.id = item.id;
+        const isScrobbled = !!item.scrobbledAt;
+        if (isScrobbled) {
+          tr.classList.add('scrobbled');
+        }
+        const checkCell = lastfmEnabled
+          ? (isScrobbled
+            ? '<td class="check-cell">✓</td>'
+            : '<td class="check-cell"><input type="checkbox" class="row-check" data-id="' + item.id + '" /></td>')
+          : '<td class="check-cell"></td>';
         tr.innerHTML =
+          checkCell +
           '<td>' + esc(new Date(item.playedAt).toLocaleString()) + '</td>' +
           '<td class="track-name">' + esc(item.track.name) + '</td>' +
           '<td>' + esc(item.track.artistName) + '</td>' +
@@ -400,7 +545,7 @@ const HTML = /* html */ `<!DOCTYPE html>
     // ── Init ────────────────────────────────────────────────────
     async function init() {
       await refreshAuthState();
-      await refreshPollState();
+      await Promise.all([refreshPollState(), refreshLastfmState()]);
       await loadHistory(true);
     }
 

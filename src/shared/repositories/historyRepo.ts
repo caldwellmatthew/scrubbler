@@ -94,6 +94,7 @@ export async function queryHistory(params: HistoryQueryParams): Promise<ListenHi
        lh.spotify_track_id,
        lh.spotify_user_id,
        lh.played_at,
+       lh.scrobbled_at,
        t.name,
        t.artist_name,
        t.album_name,
@@ -109,11 +110,16 @@ export async function queryHistory(params: HistoryQueryParams): Promise<ListenHi
     values,
   );
 
-  return result.rows.map((row) => ({
+  return result.rows.map(mapRow);
+}
+
+function mapRow(row: Record<string, unknown>): ListenHistoryRow {
+  return {
     id: row.id as number,
     spotifyTrackId: row.spotify_track_id as string,
     spotifyUserId: row.spotify_user_id as string,
     playedAt: row.played_at as Date,
+    scrobbledAt: row.scrobbled_at as Date | null,
     name: row.name as string,
     artistName: row.artist_name as string,
     albumName: row.album_name as string,
@@ -121,5 +127,36 @@ export async function queryHistory(params: HistoryQueryParams): Promise<ListenHi
     externalUrl: row.external_url as string | null,
     previewUrl: row.preview_url as string | null,
     imageUrl: row.image_url as string | null,
-  }));
+  };
+}
+
+export async function getByIds(ids: number[]): Promise<ListenHistoryRow[]> {
+  if (ids.length === 0) return [];
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT
+       lh.id,
+       lh.spotify_track_id,
+       lh.spotify_user_id,
+       lh.played_at,
+       lh.scrobbled_at,
+       t.name,
+       t.artist_name,
+       t.album_name,
+       t.duration_ms,
+       t.external_url,
+       t.preview_url,
+       t.image_url
+     FROM listen_history lh
+     JOIN tracks t ON t.spotify_track_id = lh.spotify_track_id
+     WHERE lh.id = ANY($1)`,
+    [ids],
+  );
+  return result.rows.map(mapRow);
+}
+
+export async function markScrobbled(ids: number[]): Promise<void> {
+  if (ids.length === 0) return;
+  const pool = getPool();
+  await pool.query('UPDATE listen_history SET scrobbled_at = NOW() WHERE id = ANY($1)', [ids]);
 }
