@@ -99,6 +99,9 @@ const HTML = /* html */ `<!DOCTYPE html>
     }
     td.track-name { color: #fff; }
     tr:hover td { background: #181818; }
+    tbody tr:not(.scrobbled) { cursor: pointer; }
+    tr.selected td { background: #182818; }
+    tr.selected:hover td { background: #1e3020; }
     #load-more {
       margin-top: 1.25rem;
       cursor: pointer;
@@ -382,6 +385,8 @@ const HTML = /* html */ `<!DOCTYPE html>
     });
 
     // ── Scrobble bar ─────────────────────────────────────────────
+    let lastClickedIdx = -1;
+
     function updateScrobbleBar() {
       if (!lastfmEnabled) return;
       if (selectedIds.size > 0) {
@@ -392,23 +397,63 @@ const HTML = /* html */ `<!DOCTYPE html>
       }
     }
 
+    function setRowChecked(tr, cb, checked) {
+      cb.checked = checked;
+      const id = parseInt(cb.dataset.id);
+      if (checked) selectedIds.add(id);
+      else selectedIds.delete(id);
+      tr.classList.toggle('selected', checked);
+    }
+
+    function getSelectableRows() {
+      return [...document.querySelectorAll('#tbody tr:not(.scrobbled)')];
+    }
+
     document.getElementById('select-all').addEventListener('change', e => {
       const checked = e.target.checked;
-      document.querySelectorAll('.row-check').forEach(cb => {
-        cb.checked = checked;
-        const id = parseInt(cb.dataset.id);
-        if (checked) selectedIds.add(id);
-        else selectedIds.delete(id);
+      getSelectableRows().forEach(tr => {
+        const cb = tr.querySelector('.row-check');
+        if (cb) setRowChecked(tr, cb, checked);
       });
+      lastClickedIdx = -1;
       updateScrobbleBar();
     });
 
-    document.getElementById('tbody').addEventListener('change', e => {
-      const cb = e.target;
-      if (!cb.matches('.row-check')) return;
-      const id = parseInt(cb.dataset.id);
-      if (cb.checked) selectedIds.add(id);
-      else selectedIds.delete(id);
+    // Prevent text selection on shift+click (must intercept mousedown, not click).
+    document.getElementById('tbody').addEventListener('mousedown', e => {
+      if (e.shiftKey) e.preventDefault();
+    });
+
+    // Click anywhere on a row to toggle; shift+click for range selection.
+    document.getElementById('tbody').addEventListener('click', e => {
+      if (!lastfmEnabled) return;
+      const tr = e.target.closest('tr');
+      if (!tr || tr.classList.contains('scrobbled')) return;
+      const cb = tr.querySelector('.row-check');
+      if (!cb) return;
+
+      const rows = getSelectableRows();
+      const idx = rows.indexOf(tr);
+
+      if (e.shiftKey && lastClickedIdx !== -1) {
+        const [start, end] = [Math.min(lastClickedIdx, idx), Math.max(lastClickedIdx, idx)];
+        const targetChecked = rows[lastClickedIdx].querySelector('.row-check')?.checked ?? true;
+        for (let i = start; i <= end; i++) {
+          const rowCb = rows[i].querySelector('.row-check');
+          if (rowCb) setRowChecked(rows[i], rowCb, targetChecked);
+        }
+      } else if (e.target === cb) {
+        // Direct checkbox click: browser already toggled it, sync state
+        const id = parseInt(cb.dataset.id);
+        if (cb.checked) selectedIds.add(id);
+        else selectedIds.delete(id);
+        tr.classList.toggle('selected', cb.checked);
+        lastClickedIdx = idx;
+      } else {
+        // Click on any other part of the row: toggle
+        setRowChecked(tr, cb, !cb.checked);
+        lastClickedIdx = idx;
+      }
       updateScrobbleBar();
     });
 
@@ -429,24 +474,29 @@ const HTML = /* html */ `<!DOCTYPE html>
         alert('Scrobble failed: ' + (result.error || 'Unknown error'));
         return;
       }
-      // Mark rows as scrobbled in the UI
       for (const id of ids) {
         const cb = document.querySelector('.row-check[data-id="' + id + '"]');
         if (!cb) continue;
         const tr = cb.closest('tr');
         const td = cb.closest('td');
+        tr.classList.remove('selected');
         tr.classList.add('scrobbled');
         td.innerHTML = '✓';
         td.className = 'check-cell';
       }
       selectedIds.clear();
+      lastClickedIdx = -1;
       document.getElementById('select-all').checked = false;
       updateScrobbleBar();
     });
 
     document.getElementById('scrobble-clear-btn').addEventListener('click', () => {
+      getSelectableRows().forEach(tr => {
+        const cb = tr.querySelector('.row-check');
+        if (cb) { cb.checked = false; tr.classList.remove('selected'); }
+      });
       selectedIds.clear();
-      document.querySelectorAll('.row-check').forEach(cb => { cb.checked = false; });
+      lastClickedIdx = -1;
       document.getElementById('select-all').checked = false;
       updateScrobbleBar();
     });
