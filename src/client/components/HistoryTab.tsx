@@ -4,14 +4,14 @@ import { ScrobbleBar } from './ScrobbleBar';
 
 interface HistoryTabProps {
   items: HistoryItem[];
-  selectedIds: Set<number>;
+  selectedIds: Set<string>;
   lastfmEnabled: boolean;
   lastfmConnected: boolean;
   hasMore: boolean;
-  onSelectionChange: (ids: Set<number>) => void;
+  onSelectionChange: (ids: Set<string>) => void;
   onLoadMore: () => void;
-  onScrobble: (ids: number[]) => void;
-  scrobbledIds: Set<number>;
+  onScrobble: (ids: string[]) => void;
+  scrobbledIds: Set<string>;
 }
 
 function fmtDuration(ms: number) {
@@ -34,7 +34,7 @@ export function HistoryTab({
 
   const selectableItems = items.filter((item) => !item.scrobbledAt && !scrobbledIds.has(item.id));
 
-  const setSelection = useCallback((next: Set<number>) => {
+  const setSelection = useCallback((next: Set<string>) => {
     onSelectionChange(new Set(next));
   }, [onSelectionChange]);
 
@@ -58,7 +58,8 @@ export function HistoryTab({
     const target = e.target as HTMLElement;
     const tr = target.closest('tr');
     if (!tr) return;
-    const id = Number(tr.dataset.id);
+    const id = tr.dataset.id;
+    if (!id) return;
     const item = items.find((i) => i.id === id);
     if (!item || item.scrobbledAt || scrobbledIds.has(item.id)) return;
 
@@ -75,15 +76,7 @@ export function HistoryTab({
         else next.delete(selectableItems[i].id);
       }
       setSelection(next);
-    } else if (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'checkbox') {
-      // Direct checkbox click: browser already toggled it
-      const next = new Set(selectedIds);
-      if ((target as HTMLInputElement).checked) next.add(id);
-      else next.delete(id);
-      setSelection(next);
-      lastClickedIdx.current = idx;
     } else {
-      // Click on row: toggle
       const next = new Set(selectedIds);
       if (next.has(id)) next.delete(id);
       else next.add(id);

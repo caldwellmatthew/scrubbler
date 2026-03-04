@@ -33,15 +33,15 @@ export function App() {
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [historyOffset, setHistoryOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [scrobbledIds, setScrobbledIds] = useState<Set<number>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [scrobbledIds, setScrobbledIds] = useState<Set<string>>(new Set());
 
   // Tabs
   const [activeTab, setActiveTab] = useState<'history' | 'explorer'>('history');
 
   // Preview modal
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewIds, setPreviewIds] = useState<number[]>([]);
+  const [previewIds, setPreviewIds] = useState<string[]>([]);
 
   const lastfmEnabled = lastfmStatus?.enabled ?? false;
   const lastfmConnected = lastfmStatus?.connected ?? false;
@@ -181,12 +181,12 @@ export function App() {
     await refreshLastfmState();
   }
 
-  function handleScrobble(ids: number[]) {
+  function handleScrobble(ids: string[]) {
     setPreviewIds(ids);
     setPreviewOpen(true);
   }
 
-  function handleScrobbled(ids: number[]) {
+  function handleScrobbled(ids: string[]) {
     setScrobbledIds((prev) => {
       const next = new Set(prev);
       for (const id of ids) next.add(id);

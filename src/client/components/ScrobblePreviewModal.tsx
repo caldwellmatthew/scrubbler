@@ -3,14 +3,14 @@ import type { PreviewItem } from '../types';
 import * as api from '../api';
 
 interface ScrobblePreviewModalProps {
-  ids: number[];
+  ids: string[];
   open: boolean;
   onClose: () => void;
-  onScrobbled: (ids: number[]) => void;
+  onScrobbled: (ids: string[]) => void;
 }
 
 interface EditableRow {
-  id: number;
+  id: string;
   playedAt: string;
   artist: string;
   track: string;

@@ -86,7 +86,7 @@ export function getHistory(limit: number, offset: number): Promise<{ items: Hist
   return fetch(`/history?limit=${limit}&offset=${offset}`).then(json);
 }
 
-export function getScrobblePreview(ids: number[]): Promise<{ items: PreviewItem[]; error?: string }> {
+export function getScrobblePreview(ids: string[]): Promise<{ items: PreviewItem[]; error?: string }> {
   return fetch('/lastfm/preview', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -94,7 +94,7 @@ export function getScrobblePreview(ids: number[]): Promise<{ items: PreviewItem[
   }).then(json);
 }
 
-export function submitScrobble(ids: number[], overrides: Record<string, { track: string; album: string }>): Promise<{ ok: boolean; error?: string }> {
+export function submitScrobble(ids: string[], overrides: Record<string, { track: string; album: string }>): Promise<{ ok: boolean; error?: string }> {
   return fetch('/lastfm/scrobble', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

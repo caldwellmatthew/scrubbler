@@ -7,7 +7,7 @@ export interface Track {
 }
 
 export interface HistoryItem {
-  id: number;
+  id: string;
   playedAt: string;
   scrobbledAt: string | null;
   track: Track;
@@ -29,7 +29,7 @@ export interface NowPlayingData {
 }
 
 export interface PreviewItem {
-  id: number;
+  id: string;
   playedAt: string;
   artist: string;
   track: string;
