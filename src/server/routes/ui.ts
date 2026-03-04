@@ -488,6 +488,11 @@ const HTML = /* html */ `<!DOCTYPE html>
         hide('lastfm-username');
         hide('lastfm-disconnect-btn');
         hide('auto-scrobble-btn');
+        hide('np-enabled-btn');
+        hide('np-sanitize-btn');
+        autoScrobbleEnabled = false;
+        nowPlayingEnabled = false;
+        sanitizeNowPlaying = true;
         show('lastfm-connect-btn');
       }
     }
@@ -549,7 +554,7 @@ const HTML = /* html */ `<!DOCTYPE html>
     let lastClickedIdx = -1;
 
     function updateScrobbleBar() {
-      if (!lastfmEnabled) return;
+      if (!lastfmEnabled || !lastfmConnected) return;
       const bar = document.getElementById('scrobble-bar');
       if (selectedIds.size > 0) {
         document.getElementById('scrobble-count').textContent = selectedIds.size + ' selected';
@@ -588,7 +593,7 @@ const HTML = /* html */ `<!DOCTYPE html>
 
     // Click anywhere on a row to toggle; shift+click for range selection.
     document.getElementById('tbody').addEventListener('click', e => {
-      if (!lastfmEnabled) return;
+      if (!lastfmEnabled || !lastfmConnected) return;
       const tr = e.target.closest('tr');
       if (!tr || tr.classList.contains('scrobbled')) return;
       const cb = tr.querySelector('.row-check');
