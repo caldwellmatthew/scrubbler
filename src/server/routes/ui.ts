@@ -267,6 +267,7 @@ const HTML = /* html */ `<!DOCTYPE html>
       <div id="scrobble-bar">
         <span id="scrobble-count">0 selected</span>
         <button id="scrobble-btn">Scrobble to Last.fm</button>
+        <button id="select-album-btn">Select album</button>
         <button id="scrobble-clear-btn">Clear</button>
       </div>
       <table>
@@ -515,6 +516,25 @@ const HTML = /* html */ `<!DOCTYPE html>
       updateScrobbleBar();
     });
 
+    document.getElementById('select-album-btn').addEventListener('click', () => {
+      if (lastClickedIdx === -1) return;
+      const rows = getSelectableRows();
+      const anchor = rows[lastClickedIdx];
+      if (!anchor) return;
+      const album = anchor.dataset.album;
+      // Expand outward from anchor to find the contiguous run of the same album
+      let start = lastClickedIdx;
+      while (start > 0 && rows[start - 1].dataset.album === album) start--;
+      let end = lastClickedIdx;
+      while (end < rows.length - 1 && rows[end + 1].dataset.album === album) end++;
+      for (let i = start; i <= end; i++) {
+        const cb = rows[i].querySelector('.row-check');
+        if (cb) setRowChecked(rows[i], cb, true);
+      }
+      lastClickedIdx = end;
+      updateScrobbleBar();
+    });
+
     // ── History ─────────────────────────────────────────────────
     function esc(s) {
       return String(s)
@@ -534,6 +554,7 @@ const HTML = /* html */ `<!DOCTYPE html>
         offset = 0;
         document.getElementById('tbody').innerHTML = '';
         selectedIds.clear();
+        lastClickedIdx = -1;
         updateScrobbleBar();
       }
       const data = await fetch('/history?limit=' + LIMIT + '&offset=' + offset).then(r => r.json());
@@ -541,6 +562,7 @@ const HTML = /* html */ `<!DOCTYPE html>
       for (const item of data.items) {
         const tr = document.createElement('tr');
         tr.dataset.id = item.id;
+        tr.dataset.album = item.track.albumName;
         const isScrobbled = !!item.scrobbledAt;
         if (isScrobbled) {
           tr.classList.add('scrobbled');
