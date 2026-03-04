@@ -615,6 +615,8 @@ const HTML = /* html */ `<!DOCTYPE html>
 
     init();
     setInterval(refreshPollState, 30_000);
+    // Reload history every 60s (matches poll interval), but not while tracks are selected.
+    setInterval(() => { if (authenticated && selectedIds.size === 0) loadHistory(true); }, 60_000);
   </script>
 </body>
 </html>`;
