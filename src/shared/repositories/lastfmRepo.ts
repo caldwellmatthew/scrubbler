@@ -20,7 +20,13 @@ export async function getSession(): Promise<LastfmSession | null> {
     username: row.username as string,
     sessionKey: row.session_key as string,
     createdAt: row.created_at as Date,
+    autoScrobbleEnabled: row.auto_scrobble_enabled as boolean,
   };
+}
+
+export async function setAutoScrobble(enabled: boolean): Promise<void> {
+  const pool = getPool();
+  await pool.query('UPDATE lastfm_sessions SET auto_scrobble_enabled = $1', [enabled]);
 }
 
 export async function deleteAll(): Promise<void> {

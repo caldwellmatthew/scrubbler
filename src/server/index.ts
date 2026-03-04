@@ -7,6 +7,11 @@ import { explorerRouter } from './routes/explorer';
 import { lastfmRouter } from './routes/lastfm';
 import { uiRouter } from './routes/ui';
 import { errorHandler } from './middleware/errorHandler';
+import * as tokenRepo from '../shared/repositories/tokenRepo';
+import * as lastfmRepo from '../shared/repositories/lastfmRepo';
+import * as lastfmClient from '../shared/lastfm/client';
+import { fetchCurrentlyPlaying } from '../shared/spotify/client';
+import { cleanName } from '../shared/lastfm/clean';
 
 const app = express();
 
@@ -15,6 +20,46 @@ app.use(express.json());
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Now playing
+app.get('/now-playing', async (_req, res, next) => {
+  try {
+    const token = await tokenRepo.getFirst();
+    if (!token) { res.json({ isPlaying: false, track: null }); return; }
+    const data = await fetchCurrentlyPlaying(token);
+    if (!data?.is_playing || !data.item) { res.json({ isPlaying: false, track: null }); return; }
+    const t = data.item;
+    res.json({
+      isPlaying: true,
+      track: {
+        name: t.name,
+        artistName: t.artists.map(a => a.name).join(', '),
+        albumName: t.album.name,
+        durationMs: t.duration_ms,
+        imageUrl: t.album.images[0]?.url ?? null,
+        externalUrl: t.external_urls.spotify,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+// Push current Spotify track to Last.fm now-playing
+app.post('/now-playing/push', async (_req, res, next) => {
+  try {
+    const [token, session] = await Promise.all([tokenRepo.getFirst(), lastfmRepo.getSession()]);
+    if (!token || !session?.autoScrobbleEnabled) { res.json({ ok: false }); return; }
+    const data = await fetchCurrentlyPlaying(token);
+    if (!data?.is_playing || !data.item) { res.json({ ok: false }); return; }
+    const t = data.item;
+    await lastfmClient.updateNowPlaying({
+      artist: t.artists[0].name,
+      track: cleanName(t.name),
+      album: cleanName(t.album.name),
+      duration: Math.floor(t.duration_ms / 1000),
+    }, session.sessionKey);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
 });
 
 // Routes

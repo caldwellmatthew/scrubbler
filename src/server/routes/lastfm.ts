@@ -4,6 +4,8 @@ import * as lastfmAuth from '../../shared/lastfm/auth';
 import * as lastfmClient from '../../shared/lastfm/client';
 import * as lastfmRepo from '../../shared/repositories/lastfmRepo';
 import * as historyRepo from '../../shared/repositories/historyRepo';
+import * as tokenRepo from '../../shared/repositories/tokenRepo';
+import { fetchCurrentlyPlaying } from '../../shared/spotify/client';
 import { cleanName } from '../../shared/lastfm/clean';
 
 export const lastfmRouter = Router();
@@ -68,6 +70,37 @@ lastfmRouter.post('/disconnect', async (_req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+lastfmRouter.get('/auto-scrobble', async (_req, res, next) => {
+  try {
+    const session = await lastfmRepo.getSession();
+    res.json({ enabled: session?.autoScrobbleEnabled ?? false });
+  } catch (err) { next(err); }
+});
+
+lastfmRouter.post('/auto-scrobble', async (req, res, next) => {
+  try {
+    const { enabled } = req.body as { enabled: boolean };
+    await lastfmRepo.setAutoScrobble(enabled);
+    if (enabled) {
+      const session = await lastfmRepo.getSession();
+      const token = await tokenRepo.getFirst();
+      if (session && token) {
+        const nowPlaying = await fetchCurrentlyPlaying(token);
+        if (nowPlaying?.is_playing && nowPlaying.item) {
+          const t = nowPlaying.item;
+          await lastfmClient.updateNowPlaying({
+            artist: t.artists[0].name,
+            track: cleanName(t.name),
+            album: cleanName(t.album.name),
+            duration: Math.floor(t.duration_ms / 1000),
+          }, session.sessionKey);
+        }
+      }
+    }
+    res.json({ ok: true, enabled });
+  } catch (err) { next(err); }
 });
 
 lastfmRouter.post('/preview', async (req, res, next) => {

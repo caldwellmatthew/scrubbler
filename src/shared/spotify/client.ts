@@ -2,7 +2,7 @@ import axios from 'axios';
 import { refreshAccessToken } from './auth';
 import * as tokenRepo from '../repositories/tokenRepo';
 import type { OAuthToken } from '../types';
-import type { SpotifyRecentlyPlayedResponse, SpotifyUserProfile } from '../types';
+import type { SpotifyCurrentlyPlayingResponse, SpotifyRecentlyPlayedResponse, SpotifyUserProfile } from '../types';
 
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
 const REFRESH_BUFFER_MS = 60 * 1000; // refresh if within 60 seconds of expiry
@@ -55,6 +55,22 @@ export async function fetchRecentlyPlayed(
   );
 
   return response.data;
+}
+
+export async function fetchCurrentlyPlaying(
+  token: OAuthToken,
+): Promise<SpotifyCurrentlyPlayingResponse | null> {
+  const accessToken = await getValidToken(token);
+  const response = await axios.get(
+    `${SPOTIFY_API_BASE}/me/player/currently-playing`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      timeout: REQUEST_TIMEOUT_MS,
+      validateStatus: (s) => s === 200 || s === 204,
+    },
+  );
+  if (response.status === 204 || !response.data) return null;
+  return response.data as SpotifyCurrentlyPlayingResponse;
 }
 
 export async function fetchUserProfile(accessToken: string): Promise<SpotifyUserProfile> {

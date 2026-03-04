@@ -46,6 +46,7 @@ export interface LastfmSession {
   username: string;
   sessionKey: string;
   createdAt: Date;
+  autoScrobbleEnabled: boolean;
 }
 
 export interface PollState {
@@ -98,6 +99,11 @@ export interface SpotifyRecentlyPlayedResponse {
   };
   limit: number;
   href: string;
+}
+
+export interface SpotifyCurrentlyPlayingResponse {
+  is_playing: boolean;
+  item: SpotifyTrack | null;
 }
 
 export interface SpotifyTokenResponse {

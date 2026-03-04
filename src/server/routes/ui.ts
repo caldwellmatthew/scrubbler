@@ -239,6 +239,39 @@ const HTML = /* html */ `<!DOCTYPE html>
     #preview-confirm-btn { border-color:#d51007; color:#e0323f; }
     #preview-confirm-btn:hover { background:#d5100715; }
 
+    /* ── Now Playing ── */
+    #now-playing-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+      padding: 0.6rem 0.9rem;
+      background: #181818;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      font-size: 0.85rem;
+    }
+    #now-playing-bar img {
+      width: 36px;
+      height: 36px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    #now-playing-bar .np-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #1db954;
+      flex-shrink: 0;
+      animation: np-pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes np-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    #now-playing-bar .np-track { color: #fff; font-weight: 500; }
+    #now-playing-bar .np-artist { color: #888; font-size: 0.8rem; }
+
     /* ── Shared ── */
     #unauthenticated {
       text-align: center;
@@ -267,6 +300,7 @@ const HTML = /* html */ `<!DOCTYPE html>
     <span class="spacer"></span>
     <span class="meta" id="last-polled"></span>
     <span class="meta" id="lastfm-username" class="hidden"></span>
+    <button id="auto-scrobble-btn" class="hidden">Auto-scrobble: OFF</button>
     <button id="lastfm-disconnect-btn" class="hidden">Disconnect Last.fm</button>
     <a href="/lastfm/login" id="lastfm-connect-btn" class="btn hidden">Connect Last.fm</a>
     <span class="user-id" id="user-id"></span>
@@ -280,6 +314,14 @@ const HTML = /* html */ `<!DOCTYPE html>
   </div>
 
   <div id="authenticated-content" class="hidden">
+    <div id="now-playing-bar" class="hidden">
+      <span class="np-dot"></span>
+      <img id="np-img" src="" alt="" />
+      <div>
+        <div class="np-track" id="np-track"></div>
+        <div class="np-artist" id="np-artist"></div>
+      </div>
+    </div>
     <div class="tabs">
       <button class="tab active" data-tab="history">History</button>
       <button class="tab" data-tab="explorer">API Explorer</button>
@@ -357,6 +399,7 @@ const HTML = /* html */ `<!DOCTYPE html>
     let selectedIds = new Set();
     let lastfmEnabled = false;
     let lastfmConnected = false;
+    let autoScrobbleEnabled = false;
 
     function show(id) { document.getElementById(id).classList.remove('hidden'); }
     function hide(id) { document.getElementById(id).classList.add('hidden'); }
@@ -414,12 +457,27 @@ const HTML = /* html */ `<!DOCTYPE html>
         show('lastfm-username');
         show('lastfm-disconnect-btn');
         hide('lastfm-connect-btn');
+        const as = await fetch('/lastfm/auto-scrobble').then(r => r.json());
+        autoScrobbleEnabled = as.enabled;
+        document.getElementById('auto-scrobble-btn').textContent =
+          'Auto-scrobble: ' + (autoScrobbleEnabled ? 'ON' : 'OFF');
+        show('auto-scrobble-btn');
       } else {
         hide('lastfm-username');
         hide('lastfm-disconnect-btn');
+        hide('auto-scrobble-btn');
         show('lastfm-connect-btn');
       }
     }
+
+    document.getElementById('auto-scrobble-btn').addEventListener('click', async () => {
+      await fetch('/lastfm/auto-scrobble', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !autoScrobbleEnabled }),
+      });
+      await refreshLastfmState();
+    });
 
     document.getElementById('lastfm-disconnect-btn').addEventListener('click', async () => {
       await fetch('/lastfm/disconnect', { method: 'POST' });
@@ -765,15 +823,39 @@ const HTML = /* html */ `<!DOCTYPE html>
       });
     });
 
+    // ── Now Playing ──────────────────────────────────────────────
+    let currentTrackName = null;
+
+    async function refreshNowPlaying() {
+      if (!authenticated) return;
+      const data = await fetch('/now-playing').then(r => r.json());
+      if (data.isPlaying && data.track) {
+        document.getElementById('np-track').textContent = data.track.name;
+        document.getElementById('np-artist').textContent = data.track.artistName + ' · ' + data.track.albumName;
+        const img = document.getElementById('np-img');
+        if (data.track.imageUrl) { img.src = data.track.imageUrl; img.style.display = ''; }
+        else { img.style.display = 'none'; }
+        show('now-playing-bar');
+        if (autoScrobbleEnabled && data.track.name !== currentTrackName) {
+          fetch('/now-playing/push', { method: 'POST' });
+        }
+        currentTrackName = data.track.name;
+      } else {
+        hide('now-playing-bar');
+        currentTrackName = null;
+      }
+    }
+
     // ── Init ────────────────────────────────────────────────────
     async function init() {
       await refreshAuthState();
-      await Promise.all([refreshPollState(), refreshLastfmState()]);
+      await Promise.all([refreshPollState(), refreshLastfmState(), refreshNowPlaying()]);
       await loadHistory(true);
     }
 
     init();
     setInterval(refreshPollState, 30_000);
+    setInterval(refreshNowPlaying, 30_000);
     // Reload history every 60s (matches poll interval), but not while tracks are selected.
     setInterval(() => { if (authenticated && selectedIds.size === 0) loadHistory(true); }, 60_000);
   </script>

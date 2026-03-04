@@ -1,0 +1,2 @@
+ALTER TABLE lastfm_sessions
+  ADD COLUMN IF NOT EXISTS auto_scrobble_enabled BOOLEAN NOT NULL DEFAULT FALSE;

@@ -40,3 +40,31 @@ export async function scrobble(items: ScrobbleItem[], sessionKey: string): Promi
     throw new Error(`Last.fm scrobble error ${res.data.error}: ${res.data.message}`);
   }
 }
+
+export interface NowPlayingItem {
+  artist: string;
+  track: string;
+  album: string;
+  duration: number; // seconds
+}
+
+export async function updateNowPlaying(item: NowPlayingItem, sessionKey: string): Promise<void> {
+  const params: Record<string, string> = {
+    method: 'track.updateNowPlaying',
+    api_key: config.lastfmApiKey,
+    sk: sessionKey,
+    artist: item.artist,
+    track: item.track,
+    album: item.album,
+    duration: String(item.duration),
+  };
+  const api_sig = buildSig(params, config.lastfmApiSecret);
+  const body = new URLSearchParams({ ...params, api_sig, format: 'json' });
+  const res = await axios.post(LASTFM_API_URL, body.toString(), {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    timeout: REQUEST_TIMEOUT_MS,
+  });
+  if (res.data.error) {
+    throw new Error(`Last.fm nowplaying error ${res.data.error}: ${res.data.message}`);
+  }
+}

@@ -155,6 +155,21 @@ export async function getByIds(ids: number[]): Promise<ListenHistoryRow[]> {
   return result.rows.map(mapRow);
 }
 
+export async function getUnscrobbledByPlayedAts(playedAts: Date[]): Promise<ListenHistoryRow[]> {
+  if (playedAts.length === 0) return [];
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT lh.id, lh.spotify_track_id, lh.spotify_user_id, lh.played_at, lh.scrobbled_at,
+            t.name, t.artist_name, t.album_name, t.duration_ms,
+            t.external_url, t.preview_url, t.image_url
+     FROM listen_history lh
+     JOIN tracks t ON t.spotify_track_id = lh.spotify_track_id
+     WHERE lh.played_at = ANY($1) AND lh.scrobbled_at IS NULL`,
+    [playedAts],
+  );
+  return result.rows.map(mapRow);
+}
+
 export async function markScrobbled(ids: number[]): Promise<void> {
   if (ids.length === 0) return;
   const pool = getPool();
