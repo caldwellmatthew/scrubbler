@@ -107,7 +107,11 @@ export async function poll(): Promise<void> {
           duration: Math.floor(row.durationMs / 1000),
         }));
         await lastfmClient.scrobble(scrobbleItems, session.sessionKey);
-        await historyRepo.markScrobbled(rows.map(r => r.id));
+        // Mark each row with whether sanitization actually changed its values
+        const sanitizedIds = rows.filter(r => cleanName(r.name) !== r.name || cleanName(r.albumName) !== r.albumName).map(r => String(r.id));
+        const unsanitizedIds = rows.filter(r => cleanName(r.name) === r.name && cleanName(r.albumName) === r.albumName).map(r => String(r.id));
+        if (sanitizedIds.length > 0) await historyRepo.markScrobbled(sanitizedIds, true);
+        if (unsanitizedIds.length > 0) await historyRepo.markScrobbled(unsanitizedIds, false);
         console.log(`[worker] Auto-scrobbled ${scrobbleItems.length} tracks to Last.fm`);
       }
     } catch (err) {

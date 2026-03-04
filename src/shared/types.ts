@@ -30,7 +30,7 @@ export interface ListenEvent {
 }
 
 export interface ListenHistoryRow extends ListenEvent {
-  id: number;
+  id: string;
   name: string;
   artistName: string;
   albumName: string;
@@ -39,6 +39,7 @@ export interface ListenHistoryRow extends ListenEvent {
   previewUrl: string | null;
   imageUrl: string | null;
   scrobbledAt: Date | null;
+  scrobbleSanitized: boolean | null;
 }
 
 export interface LastfmSession {

@@ -147,7 +147,18 @@ export function HistoryTab({
                   <tr key={item.id} data-id={item.id} data-album={item.track.albumName} class={cls}>
                     {lastfmEnabled ? (
                       isScrobbled ? (
-                        <td class="check-cell">{'\u2713'}</td>
+                        <td class="check-cell" title={
+                          (item.scrobbleSanitized ?? scrobbledIds.has(item.id))
+                            ? 'Scrobbled (sanitized)'
+                            : item.scrobbleSanitized === false
+                              ? 'Scrobbled (original tags)'
+                              : 'Scrobbled'
+                        }>
+                          {'\u2713'}
+                          {(item.scrobbleSanitized ?? (scrobbledIds.has(item.id) || null)) === true && (
+                            <span style={{ fontSize: '0.6rem', marginLeft: '0.15rem', opacity: 0.7 }}>S</span>
+                          )}
+                        </td>
                       ) : (
                         <td class="check-cell">
                           <input type="checkbox" class="row-check" checked={isSelected} />

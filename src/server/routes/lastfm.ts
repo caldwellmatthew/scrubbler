@@ -155,7 +155,7 @@ lastfmRouter.post('/preview', async (req, res, next) => {
       res.status(503).json({ error: 'Last.fm not configured' });
       return;
     }
-    const { ids } = req.body as { ids: number[] };
+    const { ids } = req.body as { ids: string[] };
     if (!Array.isArray(ids) || ids.length === 0) {
       res.status(400).json({ error: 'ids must be a non-empty array' });
       return;
@@ -189,7 +189,7 @@ lastfmRouter.post('/scrobble', async (req, res, next) => {
       return;
     }
     const { ids, overrides = {} } = req.body as {
-      ids: number[];
+      ids: string[];
       overrides?: Record<string, { track?: string; album?: string }>;
     };
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -199,13 +199,17 @@ lastfmRouter.post('/scrobble', async (req, res, next) => {
     const rows = await historyRepo.getByIds(ids);
     const items: lastfmClient.ScrobbleItem[] = rows.map((row) => ({
       artist: row.artistName.split(', ')[0],
-      track: overrides[row.id]?.track ?? cleanName(row.name),
-      album: overrides[row.id]?.album ?? cleanName(row.albumName),
+      track: overrides[String(row.id)]?.track ?? cleanName(row.name),
+      album: overrides[String(row.id)]?.album ?? cleanName(row.albumName),
       timestamp: Math.floor(row.playedAt.getTime() / 1000),
       duration: Math.floor(row.durationMs / 1000),
     }));
     await lastfmClient.scrobble(items, session.sessionKey);
-    await historyRepo.markScrobbled(ids);
+    // Mark each row sanitized only if the values actually sent differ from the originals
+    const sanitizedIds = rows.filter((row, i) => items[i].track !== row.name || items[i].album !== row.albumName).map(r => String(r.id));
+    const unsanitizedIds = rows.filter((row, i) => items[i].track === row.name && items[i].album === row.albumName).map(r => String(r.id));
+    if (sanitizedIds.length > 0) await historyRepo.markScrobbled(sanitizedIds, true);
+    if (unsanitizedIds.length > 0) await historyRepo.markScrobbled(unsanitizedIds, false);
     res.json({ ok: true, scrobbled: items.length });
   } catch (err) {
     next(err);

@@ -95,6 +95,7 @@ export async function queryHistory(params: HistoryQueryParams): Promise<ListenHi
        lh.spotify_user_id,
        lh.played_at,
        lh.scrobbled_at,
+       lh.scrobble_sanitized,
        t.name,
        t.artist_name,
        t.album_name,
@@ -115,11 +116,12 @@ export async function queryHistory(params: HistoryQueryParams): Promise<ListenHi
 
 function mapRow(row: Record<string, unknown>): ListenHistoryRow {
   return {
-    id: row.id as number,
+    id: String(row.id),
     spotifyTrackId: row.spotify_track_id as string,
     spotifyUserId: row.spotify_user_id as string,
     playedAt: row.played_at as Date,
     scrobbledAt: row.scrobbled_at as Date | null,
+    scrobbleSanitized: row.scrobble_sanitized as boolean | null,
     name: row.name as string,
     artistName: row.artist_name as string,
     albumName: row.album_name as string,
@@ -130,7 +132,7 @@ function mapRow(row: Record<string, unknown>): ListenHistoryRow {
   };
 }
 
-export async function getByIds(ids: number[]): Promise<ListenHistoryRow[]> {
+export async function getByIds(ids: string[]): Promise<ListenHistoryRow[]> {
   if (ids.length === 0) return [];
   const pool = getPool();
   const result = await pool.query(
@@ -140,6 +142,7 @@ export async function getByIds(ids: number[]): Promise<ListenHistoryRow[]> {
        lh.spotify_user_id,
        lh.played_at,
        lh.scrobbled_at,
+       lh.scrobble_sanitized,
        t.name,
        t.artist_name,
        t.album_name,
@@ -159,7 +162,7 @@ export async function getUnscrobbledByPlayedAts(playedAts: Date[]): Promise<List
   if (playedAts.length === 0) return [];
   const pool = getPool();
   const result = await pool.query(
-    `SELECT lh.id, lh.spotify_track_id, lh.spotify_user_id, lh.played_at, lh.scrobbled_at,
+    `SELECT lh.id, lh.spotify_track_id, lh.spotify_user_id, lh.played_at, lh.scrobbled_at, lh.scrobble_sanitized,
             t.name, t.artist_name, t.album_name, t.duration_ms,
             t.external_url, t.preview_url, t.image_url
      FROM listen_history lh
@@ -170,8 +173,11 @@ export async function getUnscrobbledByPlayedAts(playedAts: Date[]): Promise<List
   return result.rows.map(mapRow);
 }
 
-export async function markScrobbled(ids: number[]): Promise<void> {
+export async function markScrobbled(ids: string[], sanitized: boolean): Promise<void> {
   if (ids.length === 0) return;
   const pool = getPool();
-  await pool.query('UPDATE listen_history SET scrobbled_at = NOW() WHERE id = ANY($1)', [ids]);
+  await pool.query(
+    'UPDATE listen_history SET scrobbled_at = NOW(), scrobble_sanitized = $2 WHERE id = ANY($1)',
+    [ids, sanitized],
+  );
 }
