@@ -316,7 +316,7 @@ const HTML = /* html */ `<!DOCTYPE html>
   </div>
 
   <div id="authenticated-content" class="hidden">
-    <div id="now-playing-bar" class="hidden">
+    <div id="now-playing-bar">
       <div class="np-row" style="justify-content:space-between">
         <span class="np-vinyl">Now playing</span>
         <div style="display:flex;gap:0.4rem">
@@ -895,13 +895,16 @@ const HTML = /* html */ `<!DOCTYPE html>
         const img = document.getElementById('np-img');
         if (t.imageUrl) { img.src = t.imageUrl; img.style.display = ''; }
         else { img.style.display = 'none'; }
-        show('now-playing-bar');
         if (nowPlayingEnabled && t.name !== currentTrackName) {
           fetch('/now-playing/push', { method: 'POST' });
         }
         currentTrackName = t.name;
       } else {
-        hide('now-playing-bar');
+        document.getElementById('np-track').textContent = '—';
+        document.getElementById('np-artist').textContent = '';
+        document.getElementById('np-img').style.display = 'none';
+        const cleaned = document.getElementById('np-cleaned');
+        if (cleaned) cleaned.remove();
         currentTrackName = null;
       }
     }
