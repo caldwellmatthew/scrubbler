@@ -60,6 +60,20 @@ const HTML = /* html */ `<!DOCTYPE html>
     .user-id { font-size: 0.75rem; color: #555; }
     .spacer { margin-left: auto; }
     .meta { font-size: 0.75rem; color: #555; }
+    .header-group {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding-left: 0.75rem;
+      border-left: 1px solid #2a2a2a;
+    }
+    .group-label {
+      font-size: 0.65rem;
+      color: #444;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 600;
+    }
 
     /* ── Tabs ── */
     .tabs {
@@ -299,15 +313,21 @@ const HTML = /* html */ `<!DOCTYPE html>
     <h1>Spotify Cache</h1>
     <span id="poll-pill" class="pill hidden">...</span>
     <button id="toggle-btn" class="hidden">...</button>
-    <span class="spacer"></span>
     <span class="meta" id="last-polled"></span>
-    <span class="meta" id="lastfm-username" class="hidden"></span>
-    <button id="auto-scrobble-btn" class="hidden">Auto-scrobble: OFF</button>
-    <button id="lastfm-disconnect-btn" class="hidden">Disconnect Last.fm</button>
-    <a href="/lastfm/login" id="lastfm-connect-btn" class="btn hidden">Connect Last.fm</a>
-    <span class="user-id" id="user-id"></span>
-    <button id="logout-btn" class="hidden">Log out</button>
-    <a href="/auth/login" id="login-btn" class="btn hidden">Connect Spotify</a>
+    <span class="spacer"></span>
+    <div class="header-group">
+      <span class="group-label">Last.fm</span>
+      <span class="meta" id="lastfm-username" class="hidden"></span>
+      <button id="auto-scrobble-btn" class="hidden">Auto-scrobble: OFF</button>
+      <button id="lastfm-disconnect-btn" class="hidden">Disconnect Last.fm</button>
+      <a href="/lastfm/login" id="lastfm-connect-btn" class="btn hidden">Connect Last.fm</a>
+    </div>
+    <div class="header-group">
+      <span class="group-label">Spotify</span>
+      <span class="user-id" id="user-id"></span>
+      <button id="logout-btn" class="hidden">Log out</button>
+      <a href="/auth/login" id="login-btn" class="btn hidden">Connect Spotify</a>
+    </div>
   </header>
 
   <div id="unauthenticated" class="hidden">
