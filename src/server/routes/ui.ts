@@ -12,7 +12,7 @@ const HTML = /* html */ `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Spotify Cache</title>
+  <title>Scrubbler</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -310,7 +310,7 @@ const HTML = /* html */ `<!DOCTYPE html>
 </head>
 <body>
   <header>
-    <h1>Spotify Cache</h1>
+    <h1>Scrubbler</h1>
     <span id="poll-pill" class="pill hidden">...</span>
     <button id="toggle-btn" class="hidden">...</button>
     <span class="meta" id="last-polled"></span>

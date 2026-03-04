@@ -1,4 +1,4 @@
-# Spotify Cache Service
+# Scrubbler
 
 TypeScript/Node.js service that polls the Spotify recently-played API and caches results to PostgreSQL.
 

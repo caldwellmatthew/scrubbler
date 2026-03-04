@@ -1,7 +1,7 @@
 {
-  "name": "spotify-cache",
+  "name": "scrubbler",
   "version": "1.0.0",
-  "description": "Polls Spotify recently-played API and caches results to PostgreSQL",
+  "description": "Scrobbles and sanitizes your Spotify listening history to Last.fm",
   "main": "dist/server/index.js",
   "scripts": {
     "dev:server": "ts-node-dev --respawn --transpile-only src/server/index.ts",

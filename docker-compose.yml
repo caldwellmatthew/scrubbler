@@ -6,14 +6,14 @@ services:
     environment:
       POSTGRES_USER: spotifyuser
       POSTGRES_PASSWORD: spotifypass
-      POSTGRES_DB: spotify_cache
+      POSTGRES_DB: scrubbler
     ports:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U spotifyuser -d spotify_cache']
+      test: ['CMD-SHELL', 'pg_isready -U spotifyuser -d scrubbler']
       interval: 5s
       timeout: 5s
       retries: 5
