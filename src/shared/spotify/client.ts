@@ -66,9 +66,28 @@ export async function fetchCurrentlyPlaying(
     {
       headers: { Authorization: `Bearer ${accessToken}` },
       timeout: REQUEST_TIMEOUT_MS,
-      validateStatus: (s) => s === 200 || s === 204,
+      validateStatus: (s) => s === 200 || s === 204 || s === 401,
     },
   );
+  if (response.status === 401) {
+    // Token was revoked (e.g. worker refreshed it) — force refresh and retry once
+    console.log(`[client] Got 401 for currently-playing — forcing token refresh`);
+    const refreshed = await refreshAccessToken(token.refreshToken);
+    await tokenRepo.updateTokens(token.spotifyUserId, refreshed.accessToken, refreshed.refreshToken, refreshed.expiresAt);
+    token.accessToken = refreshed.accessToken;
+    token.refreshToken = refreshed.refreshToken;
+    token.expiresAt = refreshed.expiresAt;
+    const retry = await axios.get(
+      `${SPOTIFY_API_BASE}/me/player/currently-playing`,
+      {
+        headers: { Authorization: `Bearer ${refreshed.accessToken}` },
+        timeout: REQUEST_TIMEOUT_MS,
+        validateStatus: (s) => s === 200 || s === 204,
+      },
+    );
+    if (retry.status === 204 || !retry.data) return null;
+    return retry.data as SpotifyCurrentlyPlayingResponse;
+  }
   if (response.status === 204 || !response.data) return null;
   return response.data as SpotifyCurrentlyPlayingResponse;
 }

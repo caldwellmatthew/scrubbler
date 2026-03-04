@@ -23,7 +23,7 @@ app.get('/health', (_req, res) => {
 });
 
 // Now playing
-app.get('/now-playing', async (_req, res, next) => {
+app.get('/now-playing', async (_req, res) => {
   try {
     const [token, session] = await Promise.all([tokenRepo.getFirst(), lastfmRepo.getSession()]);
     if (!token) { res.json({ isPlaying: false, track: null }); return; }
@@ -44,11 +44,14 @@ app.get('/now-playing', async (_req, res, next) => {
         externalUrl: t.external_urls.spotify,
       },
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('[server] now-playing error:', err instanceof Error ? err.message : err);
+    res.json({ isPlaying: false, track: null, error: err instanceof Error ? err.message : 'Unknown error' });
+  }
 });
 
 // Push current Spotify track to Last.fm now-playing
-app.post('/now-playing/push', async (_req, res, next) => {
+app.post('/now-playing/push', async (_req, res) => {
   try {
     const [token, session] = await Promise.all([tokenRepo.getFirst(), lastfmRepo.getSession()]);
     if (!token || !session?.nowPlayingEnabled) { res.json({ ok: false }); return; }
@@ -63,7 +66,10 @@ app.post('/now-playing/push', async (_req, res, next) => {
       duration: Math.floor(t.duration_ms / 1000),
     }, session.sessionKey);
     res.json({ ok: true });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('[server] now-playing/push error:', err instanceof Error ? err.message : err);
+    res.json({ ok: false });
+  }
 });
 
 // Routes
