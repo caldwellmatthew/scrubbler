@@ -272,6 +272,7 @@ const HTML = /* html */ `<!DOCTYPE html>
     }
     #now-playing-bar .np-track { color: #fff; font-weight: 500; }
     #now-playing-bar .np-artist { color: #888; font-size: 0.8rem; }
+    #now-playing-bar .np-cleaned { color: #666; font-size: 0.75rem; }
 
     /* ── Shared ── */
     #unauthenticated {
@@ -833,16 +834,34 @@ const HTML = /* html */ `<!DOCTYPE html>
       if (!authenticated) return;
       const data = await fetch('/now-playing').then(r => r.json());
       if (data.isPlaying && data.track) {
-        document.getElementById('np-track').textContent = data.track.name;
-        document.getElementById('np-artist').textContent = data.track.artistName + ' · ' + data.track.albumName;
+        const t = data.track;
+        document.getElementById('np-track').textContent = t.name;
+        document.getElementById('np-artist').textContent = t.artistName + ' · ' + t.albumName;
+        let cleaned = document.getElementById('np-cleaned');
+        const trackChanged = t.cleanedName !== t.name;
+        const albumChanged = t.cleanedAlbumName !== t.albumName;
+        if (trackChanged || albumChanged) {
+          if (!cleaned) {
+            cleaned = document.createElement('div');
+            cleaned.id = 'np-cleaned';
+            cleaned.className = 'np-cleaned';
+            document.getElementById('np-artist').after(cleaned);
+          }
+          const parts = [];
+          if (trackChanged) parts.push('track → "' + t.cleanedName + '"');
+          if (albumChanged) parts.push('album → "' + t.cleanedAlbumName + '"');
+          cleaned.textContent = 'Sent to Last.fm: ' + parts.join(', ');
+        } else if (cleaned) {
+          cleaned.remove();
+        }
         const img = document.getElementById('np-img');
-        if (data.track.imageUrl) { img.src = data.track.imageUrl; img.style.display = ''; }
+        if (t.imageUrl) { img.src = t.imageUrl; img.style.display = ''; }
         else { img.style.display = 'none'; }
         show('now-playing-bar');
-        if (autoScrobbleEnabled && data.track.name !== currentTrackName) {
+        if (autoScrobbleEnabled && t.name !== currentTrackName) {
           fetch('/now-playing/push', { method: 'POST' });
         }
-        currentTrackName = data.track.name;
+        currentTrackName = t.name;
       } else {
         hide('now-playing-bar');
         currentTrackName = null;

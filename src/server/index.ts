@@ -36,6 +36,8 @@ app.get('/now-playing', async (_req, res, next) => {
         name: t.name,
         artistName: t.artists.map(a => a.name).join(', '),
         albumName: t.album.name,
+        cleanedName: cleanName(t.name),
+        cleanedAlbumName: cleanName(t.album.name),
         durationMs: t.duration_ms,
         imageUrl: t.album.images[0]?.url ?? null,
         externalUrl: t.external_urls.spotify,
