@@ -51,7 +51,7 @@ app.get('/now-playing', async (_req, res, next) => {
 app.post('/now-playing/push', async (_req, res, next) => {
   try {
     const [token, session] = await Promise.all([tokenRepo.getFirst(), lastfmRepo.getSession()]);
-    if (!token || !session?.autoScrobbleEnabled) { res.json({ ok: false }); return; }
+    if (!token || !session?.nowPlayingEnabled) { res.json({ ok: false }); return; }
     const data = await fetchCurrentlyPlaying(token);
     if (!data?.is_playing || !data.item) { res.json({ ok: false }); return; }
     const t = data.item;
