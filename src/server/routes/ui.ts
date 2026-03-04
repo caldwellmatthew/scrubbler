@@ -216,6 +216,29 @@ const HTML = /* html */ `<!DOCTYPE html>
     #response-output::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
     #response-output::-webkit-scrollbar-thumb:hover { background: #555; }
 
+    /* ── Scrobble preview modal ── */
+    #preview-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.75);
+      z-index:100; align-items:center; justify-content:center; }
+    #preview-modal.open { display:flex; }
+    #preview-box { background:#1a1a1a; border:1px solid #333; border-radius:10px;
+      padding:1.5rem; max-width:900px; width:90vw; max-height:80vh;
+      display:flex; flex-direction:column; gap:1rem; }
+    #preview-box h2 { font-size:1rem; color:#fff; font-weight:600; }
+    #preview-scroll { overflow-y:auto; flex:1; }
+    #preview-table { width:100%; border-collapse:collapse; }
+    #preview-table th { color:#555; font-weight:500; text-align:left;
+      padding:0.4rem 0.6rem; border-bottom:1px solid #2a2a2a; font-size:0.8rem; }
+    #preview-table td { padding:0.35rem 0.6rem; border-bottom:1px solid #1c1c1c; }
+    #preview-table td.artist-cell { color:#aaa; font-size:0.8rem; white-space:nowrap; }
+    #preview-table input { background:#111; border:1px solid #333; border-radius:4px;
+      color:#e0e0e0; padding:0.25rem 0.5rem; font-size:0.8rem; width:100%; }
+    #preview-table input:focus { outline:none; border-color:#555; }
+    tr.preview-changed td { background:#1e1a10; }
+    tr.preview-changed input { border-color:#7a6020; }
+    #preview-actions { display:flex; gap:0.75rem; justify-content:flex-end; }
+    #preview-confirm-btn { border-color:#d51007; color:#e0323f; }
+    #preview-confirm-btn:hover { background:#d5100715; }
+
     /* ── Shared ── */
     #unauthenticated {
       text-align: center;
@@ -299,6 +322,30 @@ const HTML = /* html */ `<!DOCTYPE html>
       </div>
       <div class="response-meta" id="response-meta"></div>
       <pre id="response-output">Hit Send to make a request.</pre>
+    </div>
+  </div>
+
+  <!-- Scrobble preview modal -->
+  <div id="preview-modal">
+    <div id="preview-box">
+      <h2 id="preview-title">Preview scrobble</h2>
+      <div id="preview-scroll">
+        <table id="preview-table">
+          <thead>
+            <tr>
+              <th>Played at</th>
+              <th>Artist</th>
+              <th>Track</th>
+              <th>Album</th>
+            </tr>
+          </thead>
+          <tbody id="preview-tbody"></tbody>
+        </table>
+      </div>
+      <div id="preview-actions">
+        <button id="preview-cancel-btn">Cancel</button>
+        <button id="preview-confirm-btn">Scrobble</button>
+      </div>
     </div>
   </div>
 
@@ -472,23 +519,10 @@ const HTML = /* html */ `<!DOCTYPE html>
       updateScrobbleBar();
     });
 
-    document.getElementById('scrobble-btn').addEventListener('click', async () => {
-      const ids = [...selectedIds];
-      let result;
-      try {
-        result = await fetch('/lastfm/scrobble', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids }),
-        }).then(r => r.json());
-      } catch (err) {
-        alert('Scrobble failed: ' + err.message);
-        return;
-      }
-      if (!result.ok) {
-        alert('Scrobble failed: ' + (result.error || 'Unknown error'));
-        return;
-      }
+    // ── Scrobble preview modal ────────────────────────────────────
+    let previewIds = [];
+
+    function markScrobbledInTable(ids) {
       for (const id of ids) {
         const cb = document.querySelector('.row-check[data-id="' + id + '"]');
         if (!cb) continue;
@@ -503,6 +537,109 @@ const HTML = /* html */ `<!DOCTYPE html>
       lastClickedIdx = -1;
       document.getElementById('select-all').checked = false;
       updateScrobbleBar();
+    }
+
+    async function openScrobblePreview(ids) {
+      let preview;
+      try {
+        preview = await fetch('/lastfm/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids }),
+        }).then(r => r.json());
+      } catch (err) {
+        alert('Preview failed: ' + err.message);
+        return;
+      }
+      if (preview.error) {
+        alert('Preview failed: ' + preview.error);
+        return;
+      }
+
+      previewIds = ids;
+      const tbody = document.getElementById('preview-tbody');
+      tbody.innerHTML = '';
+      for (const item of preview.items) {
+        const changed = item.track !== item.originalTrack || item.album !== item.originalAlbum;
+        const tr = document.createElement('tr');
+        if (changed) tr.classList.add('preview-changed');
+        tr.dataset.id = item.id;
+        tr.innerHTML =
+          '<td class="artist-cell">' + esc(new Date(item.playedAt).toLocaleString()) + '</td>' +
+          '<td class="artist-cell">' + esc(item.artist) + '</td>' +
+          '<td><input class="preview-track" data-default="' + esc(item.track) + '" value="' + esc(item.track) + '" title="Original: ' + esc(item.originalTrack) + '" /></td>' +
+          '<td><input class="preview-album" data-default="' + esc(item.album) + '" value="' + esc(item.album) + '" title="Original: ' + esc(item.originalAlbum) + '" /></td>';
+        tbody.appendChild(tr);
+      }
+      // If every track shares the same album, syncing one album input updates them all.
+      const albumValues = preview.items.map(i => i.album);
+      const allSameAlbum = albumValues.length > 1 && albumValues.every(v => v === albumValues[0]);
+      if (allSameAlbum) {
+        const albumInputs = [...tbody.querySelectorAll('.preview-album')];
+        albumInputs.forEach(input => {
+          input.addEventListener('input', () => {
+            albumInputs.forEach(other => { if (other !== input) other.value = input.value; });
+          });
+        });
+      }
+      document.getElementById('preview-title').textContent =
+        'Preview scrobble — ' + ids.length + ' track' + (ids.length === 1 ? '' : 's');
+      document.getElementById('preview-confirm-btn').textContent =
+        'Scrobble ' + ids.length + ' track' + (ids.length === 1 ? '' : 's');
+      document.getElementById('preview-modal').classList.add('open');
+    }
+
+    function collectOverrides() {
+      const overrides = {};
+      document.querySelectorAll('#preview-tbody tr').forEach(tr => {
+        const id = tr.dataset.id;
+        const trackInput = tr.querySelector('.preview-track');
+        const albumInput = tr.querySelector('.preview-album');
+        const track = trackInput.value;
+        const album = albumInput.value;
+        const defaultTrack = trackInput.dataset.default;
+        const defaultAlbum = albumInput.dataset.default;
+        if (track !== defaultTrack || album !== defaultAlbum) {
+          overrides[id] = { track, album };
+        }
+      });
+      return overrides;
+    }
+
+    document.getElementById('preview-cancel-btn').addEventListener('click', () => {
+      document.getElementById('preview-modal').classList.remove('open');
+    });
+
+    document.getElementById('preview-modal').addEventListener('click', e => {
+      if (e.target === document.getElementById('preview-modal')) {
+        document.getElementById('preview-modal').classList.remove('open');
+      }
+    });
+
+    document.getElementById('preview-confirm-btn').addEventListener('click', async () => {
+      const ids = previewIds;
+      const overrides = collectOverrides();
+      document.getElementById('preview-modal').classList.remove('open');
+      let result;
+      try {
+        result = await fetch('/lastfm/scrobble', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids, overrides }),
+        }).then(r => r.json());
+      } catch (err) {
+        alert('Scrobble failed: ' + err.message);
+        return;
+      }
+      if (!result.ok) {
+        alert('Scrobble failed: ' + (result.error || 'Unknown error'));
+        return;
+      }
+      markScrobbledInTable(ids);
+    });
+
+    document.getElementById('scrobble-btn').addEventListener('click', () => {
+      openScrobblePreview([...selectedIds]);
     });
 
     document.getElementById('scrobble-clear-btn').addEventListener('click', () => {
