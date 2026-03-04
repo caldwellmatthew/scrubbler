@@ -38,7 +38,7 @@ setInterval(() => {
 }, STATE_TTL_MS);
 
 const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
-const SCOPES = ['user-read-recently-played', 'user-read-private', 'user-read-email'].join(' ');
+const SCOPES = ['user-read-recently-played', 'user-read-currently-playing', 'user-read-playback-state', 'user-read-private', 'user-read-email'].join(' ');
 
 authRouter.get('/status', async (_req, res, next) => {
   try {

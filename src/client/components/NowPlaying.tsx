@@ -59,8 +59,16 @@ export function NowPlaying({
           <img style={{ display: 'none' }} />
         )}
         <div>
-          <div class="np-track">{t ? t.name : '\u2014'}</div>
-          {t && <div class="np-artist">{t.artistName} · {t.albumName}</div>}
+          {t ? (
+            <>
+              <div class="np-track">{t.name}</div>
+              <div class="np-artist">{t.artistName} · {t.albumName}</div>
+            </>
+          ) : data?.error ? (
+            <div class="np-artist" style={{ color: '#e05c5c' }}>Spotify API error: {data.error}</div>
+          ) : (
+            <div class="np-track">{'\u2014'}</div>
+          )}
           {showCleaned && (
             <div class="np-cleaned">Sent to Last.fm: {cleanedParts.join(', ')}</div>
           )}

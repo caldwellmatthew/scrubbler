@@ -16,6 +16,7 @@ export interface HistoryItem {
 export interface NowPlayingData {
   isPlaying: boolean;
   sanitizeNowPlaying?: boolean;
+  error?: string;
   track: {
     name: string;
     artistName: string;
