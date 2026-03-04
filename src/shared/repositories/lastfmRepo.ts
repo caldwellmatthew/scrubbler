@@ -22,7 +22,13 @@ export async function getSession(): Promise<LastfmSession | null> {
     createdAt: row.created_at as Date,
     autoScrobbleEnabled: row.auto_scrobble_enabled as boolean,
     sanitizeNowPlaying: row.sanitize_now_playing as boolean,
+    nowPlayingEnabled: row.now_playing_enabled as boolean,
   };
+}
+
+export async function setNowPlayingEnabled(enabled: boolean): Promise<void> {
+  const pool = getPool();
+  await pool.query('UPDATE lastfm_sessions SET now_playing_enabled = $1', [enabled]);
 }
 
 export async function setAutoScrobble(enabled: boolean): Promise<void> {

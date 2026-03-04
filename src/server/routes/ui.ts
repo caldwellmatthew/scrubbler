@@ -319,7 +319,10 @@ const HTML = /* html */ `<!DOCTYPE html>
     <div id="now-playing-bar" class="hidden">
       <div class="np-row" style="justify-content:space-between">
         <span class="np-vinyl">Now playing</span>
-        <button id="np-sanitize-btn" style="font-size:0.75rem;padding:0.15rem 0.6rem;border-color:#333;color:#666"></button>
+        <div style="display:flex;gap:0.4rem">
+          <button id="np-enabled-btn" style="font-size:0.75rem;padding:0.15rem 0.6rem;border-color:#333;color:#666"></button>
+          <button id="np-sanitize-btn" style="font-size:0.75rem;padding:0.15rem 0.6rem;border-color:#333;color:#666"></button>
+        </div>
       </div>
       <div class="np-row">
         <img id="np-img" src="" alt="" />
@@ -408,6 +411,7 @@ const HTML = /* html */ `<!DOCTYPE html>
     let lastfmConnected = false;
     let autoScrobbleEnabled = false;
     let sanitizeNowPlaying = true;
+    let nowPlayingEnabled = false;
 
     function show(id) { document.getElementById(id).classList.remove('hidden'); }
     function hide(id) { document.getElementById(id).classList.add('hidden'); }
@@ -465,15 +469,19 @@ const HTML = /* html */ `<!DOCTYPE html>
         show('lastfm-username');
         show('lastfm-disconnect-btn');
         hide('lastfm-connect-btn');
-        const [as, snp] = await Promise.all([
+        const [as, npe, snp] = await Promise.all([
           fetch('/lastfm/auto-scrobble').then(r => r.json()),
+          fetch('/lastfm/now-playing-enabled').then(r => r.json()),
           fetch('/lastfm/sanitize-now-playing').then(r => r.json()),
         ]);
         autoScrobbleEnabled = as.enabled;
+        nowPlayingEnabled = npe.enabled;
         sanitizeNowPlaying = snp.enabled;
         document.getElementById('auto-scrobble-btn').textContent =
           'Auto-scrobble: ' + (autoScrobbleEnabled ? 'ON' : 'OFF');
         show('auto-scrobble-btn');
+        document.getElementById('np-enabled-btn').textContent =
+          'Update Last.fm: ' + (nowPlayingEnabled ? 'ON' : 'OFF');
         document.getElementById('np-sanitize-btn').textContent =
           'Sanitize tags: ' + (sanitizeNowPlaying ? 'ON' : 'OFF');
       } else {
@@ -491,6 +499,16 @@ const HTML = /* html */ `<!DOCTYPE html>
         body: JSON.stringify({ enabled: !autoScrobbleEnabled }),
       });
       await refreshLastfmState();
+    });
+
+    document.getElementById('np-enabled-btn').addEventListener('click', async () => {
+      await fetch('/lastfm/now-playing-enabled', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !nowPlayingEnabled }),
+      });
+      await refreshLastfmState();
+      await refreshNowPlaying();
     });
 
     document.getElementById('np-sanitize-btn').addEventListener('click', async () => {
@@ -878,7 +896,7 @@ const HTML = /* html */ `<!DOCTYPE html>
         if (t.imageUrl) { img.src = t.imageUrl; img.style.display = ''; }
         else { img.style.display = 'none'; }
         show('now-playing-bar');
-        if (autoScrobbleEnabled && t.name !== currentTrackName) {
+        if (nowPlayingEnabled && t.name !== currentTrackName) {
           fetch('/now-playing/push', { method: 'POST' });
         }
         currentTrackName = t.name;

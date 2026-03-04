@@ -83,6 +83,21 @@ lastfmRouter.post('/auto-scrobble', async (req, res, next) => {
   try {
     const { enabled } = req.body as { enabled: boolean };
     await lastfmRepo.setAutoScrobble(enabled);
+    res.json({ ok: true, enabled });
+  } catch (err) { next(err); }
+});
+
+lastfmRouter.get('/now-playing-enabled', async (_req, res, next) => {
+  try {
+    const session = await lastfmRepo.getSession();
+    res.json({ enabled: session?.nowPlayingEnabled ?? false });
+  } catch (err) { next(err); }
+});
+
+lastfmRouter.post('/now-playing-enabled', async (req, res, next) => {
+  try {
+    const { enabled } = req.body as { enabled: boolean };
+    await lastfmRepo.setNowPlayingEnabled(enabled);
     if (enabled) {
       const session = await lastfmRepo.getSession();
       const token = await tokenRepo.getFirst();

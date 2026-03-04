@@ -93,25 +93,30 @@ export async function poll(): Promise<void> {
 
   // 7. Auto-scrobble if enabled
   const session = await lastfmRepo.getSession();
-  if (session?.autoScrobbleEnabled) {
+  if (session?.autoScrobbleEnabled && events.length > 0) {
     try {
-      if (events.length > 0) {
-        const rows = await historyRepo.getUnscrobbledByPlayedAts(events.map(e => e.playedAt));
-        if (rows.length > 0) {
-          rows.sort((a, b) => a.playedAt.getTime() - b.playedAt.getTime());
-          const scrobbleItems = rows.map(row => ({
-            artist: row.artistName.split(', ')[0],
-            track: cleanName(row.name),
-            album: cleanName(row.albumName),
-            timestamp: Math.floor(row.playedAt.getTime() / 1000),
-            duration: Math.floor(row.durationMs / 1000),
-          }));
-          await lastfmClient.scrobble(scrobbleItems, session.sessionKey);
-          await historyRepo.markScrobbled(rows.map(r => r.id));
-          console.log(`[worker] Auto-scrobbled ${scrobbleItems.length} tracks to Last.fm`);
-        }
+      const rows = await historyRepo.getUnscrobbledByPlayedAts(events.map(e => e.playedAt));
+      if (rows.length > 0) {
+        rows.sort((a, b) => a.playedAt.getTime() - b.playedAt.getTime());
+        const scrobbleItems = rows.map(row => ({
+          artist: row.artistName.split(', ')[0],
+          track: cleanName(row.name),
+          album: cleanName(row.albumName),
+          timestamp: Math.floor(row.playedAt.getTime() / 1000),
+          duration: Math.floor(row.durationMs / 1000),
+        }));
+        await lastfmClient.scrobble(scrobbleItems, session.sessionKey);
+        await historyRepo.markScrobbled(rows.map(r => r.id));
+        console.log(`[worker] Auto-scrobbled ${scrobbleItems.length} tracks to Last.fm`);
       }
-      // Update now playing from live Spotify state
+    } catch (err) {
+      console.error('[worker] Auto-scrobble failed:', err);
+    }
+  }
+
+  // 8. Update Last.fm now playing if enabled (independent of auto-scrobble)
+  if (session?.nowPlayingEnabled) {
+    try {
       const nowPlaying = await fetchCurrentlyPlaying(token);
       if (nowPlaying?.is_playing && nowPlaying.item) {
         const t = nowPlaying.item;
@@ -128,8 +133,7 @@ export async function poll(): Promise<void> {
         console.log(`[worker] Now playing: nothing (Spotify idle or no active device)`);
       }
     } catch (err) {
-      console.error('[worker] Auto-scrobble failed:', err);
-      // Non-fatal: history insert already committed
+      console.error('[worker] Now playing update failed:', err);
     }
   }
 }
