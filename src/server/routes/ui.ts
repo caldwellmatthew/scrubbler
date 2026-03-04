@@ -242,8 +242,8 @@ const HTML = /* html */ `<!DOCTYPE html>
     /* ── Now Playing ── */
     #now-playing-bar {
       display: flex;
-      align-items: center;
-      gap: 0.75rem;
+      flex-direction: column;
+      gap: 0.4rem;
       margin-bottom: 1.25rem;
       padding: 0.6rem 0.9rem;
       background: #181818;
@@ -251,23 +251,24 @@ const HTML = /* html */ `<!DOCTYPE html>
       border-radius: 8px;
       font-size: 0.85rem;
     }
+    #now-playing-bar .np-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
     #now-playing-bar img {
       width: 36px;
       height: 36px;
       border-radius: 4px;
       flex-shrink: 0;
     }
-    #now-playing-bar .np-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #1db954;
+    .np-vinyl {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: #1db954;
       flex-shrink: 0;
-      animation: np-pulse 1.5s ease-in-out infinite;
-    }
-    @keyframes np-pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
+      text-transform: uppercase;
     }
     #now-playing-bar .np-track { color: #fff; font-weight: 500; }
     #now-playing-bar .np-artist { color: #888; font-size: 0.8rem; }
@@ -315,11 +316,13 @@ const HTML = /* html */ `<!DOCTYPE html>
 
   <div id="authenticated-content" class="hidden">
     <div id="now-playing-bar" class="hidden">
-      <span class="np-dot"></span>
-      <img id="np-img" src="" alt="" />
-      <div>
-        <div class="np-track" id="np-track"></div>
-        <div class="np-artist" id="np-artist"></div>
+      <span class="np-vinyl">Now playing</span>
+      <div class="np-row">
+        <img id="np-img" src="" alt="" />
+        <div>
+          <div class="np-track" id="np-track"></div>
+          <div class="np-artist" id="np-artist"></div>
+        </div>
       </div>
     </div>
     <div class="tabs">
