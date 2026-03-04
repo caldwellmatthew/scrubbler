@@ -4,10 +4,11 @@ TypeScript/Node.js app that polls Spotify's recently-played and currently-playin
 
 ## Architecture
 
-Two separate Node.js processes share one PostgreSQL database:
+Three pieces share one PostgreSQL database:
 
-- **Server** (`src/server/`) — Express HTTP server exposing the REST API, OAuth callbacks, and the web UI
+- **Server** (`src/server/`) — Express HTTP server exposing the REST API and OAuth callbacks. In production, also serves the built client.
 - **Worker** (`src/worker/`) — setInterval polling loop that fetches/stores Spotify history, auto-scrobbles to Last.fm, and pushes now-playing status
+- **Client** (`src/client/`) — Preact + Vite SPA. In development, runs on its own dev server (port 5173) with API proxy to the Express server. Built to `dist/client/` for production.
 - **Shared** (`src/shared/`) — config, DB pool, types, Spotify client, Last.fm client, and repositories
 
 ## Quick Start
@@ -20,16 +21,18 @@ docker compose up -d
 cp .env.example .env
 # Required: SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, OAUTH_STATE_SECRET
 # Optional: LASTFM_API_KEY, LASTFM_API_SECRET (for scrobbling)
+# Dev only: CLIENT_ORIGIN=http://localhost:5173
 
 # 3. Install dependencies
 npm install
 
-# 4. Start both processes (in separate terminals)
+# 4. Start all three processes (in separate terminals)
 npm run dev:server
 npm run dev:worker
+npm run dev:client
 
-# 5. Authenticate via browser
-open http://localhost:3000/auth/login
+# 5. Authenticate via browser (must use 127.0.0.1, not localhost — Spotify API restriction)
+open http://localhost:5173/auth/login
 ```
 
 ## Environment Variables
@@ -45,6 +48,7 @@ open http://localhost:3000/auth/login
 | `NODE_ENV` | No | `development` or `production` |
 | `LASTFM_API_KEY` | No | From Last.fm API account (enables scrobbling) |
 | `LASTFM_API_SECRET` | No | From Last.fm API account |
+| `CLIENT_ORIGIN` | No | Origin of the client app for post-auth redirects. Set to `http://localhost:5173` in development. Leave empty in production. |
 
 ## API Endpoints
 
@@ -82,14 +86,31 @@ open http://localhost:3000/auth/login
 ## Development Commands
 
 ```bash
-npm run dev:server    # Start server with hot-reload
+npm run dev:server    # Start Express server with hot-reload (port 3000)
 npm run dev:worker    # Start worker with hot-reload
-npm run build         # Compile TypeScript to dist/
-npm run start:server  # Run compiled server
+npm run dev:client    # Start Vite dev server with HMR (port 5173)
+npm run build         # Compile server (tsc) + client (vite build)
+npm run build:server  # Compile server only
+npm run build:client  # Build client only
+npm run start:server  # Run compiled server (NODE_ENV=production, serves client)
 npm run start:worker  # Run compiled worker
-npm run typecheck     # Type-check without emitting
+npm run typecheck     # Type-check both server and client
 npm run migrate       # Apply migrations manually
 ```
+
+## Client Architecture
+
+The client is a Preact SPA built with Vite (`src/client/`).
+
+- **Config**: `vite.config.ts` (root), `tsconfig.client.json` (separate from server tsconfig)
+- **Entry**: `src/client/index.html` → `main.tsx` → `app.tsx`
+- **State**: All state lives in `App.tsx` via `useState`, passed as props (2-3 levels deep, no context)
+- **Components**: `Header`, `NowPlaying`, `HistoryTab`, `ScrobbleBar`, `ScrobblePreviewModal`, `ExplorerTab`
+- **API layer**: `api.ts` — typed fetch wrappers for every endpoint
+- **Types**: `types.ts` — client-side types mirroring API JSON (does NOT import from `src/shared/`)
+- **CSS**: `app.css` — all styles in one file, uses class selectors plus a few IDs for single-instance elements
+
+In development, the Vite dev server (port 5173) proxies all API routes to the Express server (port 3000). In production, Express serves the built client from `dist/client/` with SPA fallback.
 
 ## Database Schema
 
@@ -103,7 +124,7 @@ npm run migrate       # Apply migrations manually
 
 1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
 2. Create an app
-3. Add `http://localhost:3000/auth/callback` to Redirect URIs
+3. Add `http://127.0.0.1:3000/auth/callback` to Redirect URIs (must use `127.0.0.1`, not `localhost`)
 4. Copy Client ID and Client Secret to `.env`
 
 ## Last.fm App Setup

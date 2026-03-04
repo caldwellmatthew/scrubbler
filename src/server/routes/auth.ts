@@ -117,7 +117,7 @@ authRouter.get('/callback', async (req, res, next) => {
 
     console.log(`[auth] Successfully authenticated Spotify user: ${profile.id}`);
 
-    res.redirect('/');
+    res.redirect(config.clientOrigin + '/');
   } catch (err) {
     next(err);
   }
