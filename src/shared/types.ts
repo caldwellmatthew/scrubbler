@@ -47,6 +47,7 @@ export interface LastfmSession {
   sessionKey: string;
   createdAt: Date;
   autoScrobbleEnabled: boolean;
+  sanitizeNowPlaying: boolean;
 }
 
 export interface PollState {

@@ -90,15 +90,31 @@ lastfmRouter.post('/auto-scrobble', async (req, res, next) => {
         const nowPlaying = await fetchCurrentlyPlaying(token);
         if (nowPlaying?.is_playing && nowPlaying.item) {
           const t = nowPlaying.item;
+          const sanitize = session.sanitizeNowPlaying;
           await lastfmClient.updateNowPlaying({
             artist: t.artists[0].name,
-            track: cleanName(t.name),
-            album: cleanName(t.album.name),
+            track: sanitize ? cleanName(t.name) : t.name,
+            album: sanitize ? cleanName(t.album.name) : t.album.name,
             duration: Math.floor(t.duration_ms / 1000),
           }, session.sessionKey);
         }
       }
     }
+    res.json({ ok: true, enabled });
+  } catch (err) { next(err); }
+});
+
+lastfmRouter.get('/sanitize-now-playing', async (_req, res, next) => {
+  try {
+    const session = await lastfmRepo.getSession();
+    res.json({ enabled: session?.sanitizeNowPlaying ?? true });
+  } catch (err) { next(err); }
+});
+
+lastfmRouter.post('/sanitize-now-playing', async (req, res, next) => {
+  try {
+    const { enabled } = req.body as { enabled: boolean };
+    await lastfmRepo.setSanitizeNowPlaying(enabled);
     res.json({ ok: true, enabled });
   } catch (err) { next(err); }
 });

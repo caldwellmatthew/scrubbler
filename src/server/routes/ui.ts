@@ -317,7 +317,10 @@ const HTML = /* html */ `<!DOCTYPE html>
 
   <div id="authenticated-content" class="hidden">
     <div id="now-playing-bar" class="hidden">
-      <span class="np-vinyl">Now playing</span>
+      <div class="np-row" style="justify-content:space-between">
+        <span class="np-vinyl">Now playing</span>
+        <button id="np-sanitize-btn" style="font-size:0.75rem;padding:0.15rem 0.6rem;border-color:#333;color:#666"></button>
+      </div>
       <div class="np-row">
         <img id="np-img" src="" alt="" />
         <div>
@@ -404,6 +407,7 @@ const HTML = /* html */ `<!DOCTYPE html>
     let lastfmEnabled = false;
     let lastfmConnected = false;
     let autoScrobbleEnabled = false;
+    let sanitizeNowPlaying = true;
 
     function show(id) { document.getElementById(id).classList.remove('hidden'); }
     function hide(id) { document.getElementById(id).classList.add('hidden'); }
@@ -461,11 +465,17 @@ const HTML = /* html */ `<!DOCTYPE html>
         show('lastfm-username');
         show('lastfm-disconnect-btn');
         hide('lastfm-connect-btn');
-        const as = await fetch('/lastfm/auto-scrobble').then(r => r.json());
+        const [as, snp] = await Promise.all([
+          fetch('/lastfm/auto-scrobble').then(r => r.json()),
+          fetch('/lastfm/sanitize-now-playing').then(r => r.json()),
+        ]);
         autoScrobbleEnabled = as.enabled;
+        sanitizeNowPlaying = snp.enabled;
         document.getElementById('auto-scrobble-btn').textContent =
           'Auto-scrobble: ' + (autoScrobbleEnabled ? 'ON' : 'OFF');
         show('auto-scrobble-btn');
+        document.getElementById('np-sanitize-btn').textContent =
+          'Sanitize tags: ' + (sanitizeNowPlaying ? 'ON' : 'OFF');
       } else {
         hide('lastfm-username');
         hide('lastfm-disconnect-btn');
@@ -481,6 +491,16 @@ const HTML = /* html */ `<!DOCTYPE html>
         body: JSON.stringify({ enabled: !autoScrobbleEnabled }),
       });
       await refreshLastfmState();
+    });
+
+    document.getElementById('np-sanitize-btn').addEventListener('click', async () => {
+      await fetch('/lastfm/sanitize-now-playing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !sanitizeNowPlaying }),
+      });
+      await refreshLastfmState();
+      await refreshNowPlaying();
     });
 
     document.getElementById('lastfm-disconnect-btn').addEventListener('click', async () => {
@@ -840,7 +860,7 @@ const HTML = /* html */ `<!DOCTYPE html>
         let cleaned = document.getElementById('np-cleaned');
         const trackChanged = t.cleanedName !== t.name;
         const albumChanged = t.cleanedAlbumName !== t.albumName;
-        if (trackChanged || albumChanged) {
+        if (data.sanitizeNowPlaying && (trackChanged || albumChanged)) {
           if (!cleaned) {
             cleaned = document.createElement('div');
             cleaned.id = 'np-cleaned';

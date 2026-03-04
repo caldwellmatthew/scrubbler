@@ -25,13 +25,14 @@ app.get('/health', (_req, res) => {
 // Now playing
 app.get('/now-playing', async (_req, res, next) => {
   try {
-    const token = await tokenRepo.getFirst();
+    const [token, session] = await Promise.all([tokenRepo.getFirst(), lastfmRepo.getSession()]);
     if (!token) { res.json({ isPlaying: false, track: null }); return; }
     const data = await fetchCurrentlyPlaying(token);
     if (!data?.is_playing || !data.item) { res.json({ isPlaying: false, track: null }); return; }
     const t = data.item;
     res.json({
       isPlaying: true,
+      sanitizeNowPlaying: session?.sanitizeNowPlaying ?? true,
       track: {
         name: t.name,
         artistName: t.artists.map(a => a.name).join(', '),
@@ -54,10 +55,11 @@ app.post('/now-playing/push', async (_req, res, next) => {
     const data = await fetchCurrentlyPlaying(token);
     if (!data?.is_playing || !data.item) { res.json({ ok: false }); return; }
     const t = data.item;
+    const sanitize = session.sanitizeNowPlaying;
     await lastfmClient.updateNowPlaying({
       artist: t.artists[0].name,
-      track: cleanName(t.name),
-      album: cleanName(t.album.name),
+      track: sanitize ? cleanName(t.name) : t.name,
+      album: sanitize ? cleanName(t.album.name) : t.album.name,
       duration: Math.floor(t.duration_ms / 1000),
     }, session.sessionKey);
     res.json({ ok: true });

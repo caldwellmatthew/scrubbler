@@ -1,0 +1,2 @@
+ALTER TABLE lastfm_sessions
+  ADD COLUMN IF NOT EXISTS sanitize_now_playing BOOLEAN NOT NULL DEFAULT TRUE;

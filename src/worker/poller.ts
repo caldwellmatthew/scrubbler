@@ -115,14 +115,15 @@ export async function poll(): Promise<void> {
       const nowPlaying = await fetchCurrentlyPlaying(token);
       if (nowPlaying?.is_playing && nowPlaying.item) {
         const t = nowPlaying.item;
+        const sanitize = session.sanitizeNowPlaying;
         console.log(`[worker] Now playing: "${t.name}" by ${t.artists[0].name}`);
         await lastfmClient.updateNowPlaying({
           artist: t.artists[0].name,
-          track: cleanName(t.name),
-          album: cleanName(t.album.name),
+          track: sanitize ? cleanName(t.name) : t.name,
+          album: sanitize ? cleanName(t.album.name) : t.album.name,
           duration: Math.floor(t.duration_ms / 1000),
         }, session.sessionKey);
-        console.log(`[worker] Sent now playing to Last.fm: "${cleanName(t.name)}" by ${t.artists[0].name}`);
+        console.log(`[worker] Sent now playing to Last.fm: "${sanitize ? cleanName(t.name) : t.name}" by ${t.artists[0].name}`);
       } else {
         console.log(`[worker] Now playing: nothing (Spotify idle or no active device)`);
       }
