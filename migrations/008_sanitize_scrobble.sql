@@ -1,0 +1,2 @@
+ALTER TABLE lastfm_sessions
+  ADD COLUMN IF NOT EXISTS sanitize_scrobble BOOLEAN NOT NULL DEFAULT TRUE;

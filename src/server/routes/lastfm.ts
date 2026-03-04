@@ -119,6 +119,21 @@ lastfmRouter.post('/now-playing-enabled', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+lastfmRouter.get('/sanitize-scrobble', async (_req, res, next) => {
+  try {
+    const session = await lastfmRepo.getSession();
+    res.json({ enabled: session?.sanitizeScrobble ?? true });
+  } catch (err) { next(err); }
+});
+
+lastfmRouter.post('/sanitize-scrobble', async (req, res, next) => {
+  try {
+    const { enabled } = req.body as { enabled: boolean };
+    await lastfmRepo.setSanitizeScrobble(enabled);
+    res.json({ ok: true, enabled });
+  } catch (err) { next(err); }
+});
+
 lastfmRouter.get('/sanitize-now-playing', async (_req, res, next) => {
   try {
     const session = await lastfmRepo.getSession();

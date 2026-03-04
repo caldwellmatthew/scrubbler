@@ -98,10 +98,11 @@ export async function poll(): Promise<void> {
       const rows = await historyRepo.getUnscrobbledByPlayedAts(events.map(e => e.playedAt));
       if (rows.length > 0) {
         rows.sort((a, b) => a.playedAt.getTime() - b.playedAt.getTime());
+        const sanitize = session.sanitizeScrobble;
         const scrobbleItems = rows.map(row => ({
           artist: row.artistName.split(', ')[0],
-          track: cleanName(row.name),
-          album: cleanName(row.albumName),
+          track: sanitize ? cleanName(row.name) : row.name,
+          album: sanitize ? cleanName(row.albumName) : row.albumName,
           timestamp: Math.floor(row.playedAt.getTime() / 1000),
           duration: Math.floor(row.durationMs / 1000),
         }));

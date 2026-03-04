@@ -47,6 +47,7 @@ export interface LastfmSession {
   sessionKey: string;
   createdAt: Date;
   autoScrobbleEnabled: boolean;
+  sanitizeScrobble: boolean;
   sanitizeNowPlaying: boolean;
   nowPlayingEnabled: boolean;
 }

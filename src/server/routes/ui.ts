@@ -319,6 +319,7 @@ const HTML = /* html */ `<!DOCTYPE html>
       <span class="group-label">Last.fm</span>
       <span class="meta" id="lastfm-username" class="hidden"></span>
       <button id="auto-scrobble-btn" class="hidden">Auto-scrobble: OFF</button>
+      <button id="sanitize-scrobble-btn" class="hidden">Sanitize tags: ON</button>
       <button id="lastfm-disconnect-btn" class="hidden">Disconnect Last.fm</button>
       <a href="/lastfm/login" id="lastfm-connect-btn" class="btn hidden">Connect Last.fm</a>
     </div>
@@ -430,6 +431,7 @@ const HTML = /* html */ `<!DOCTYPE html>
     let lastfmEnabled = false;
     let lastfmConnected = false;
     let autoScrobbleEnabled = false;
+    let sanitizeScrobble = true;
     let sanitizeNowPlaying = true;
     let nowPlayingEnabled = false;
 
@@ -489,17 +491,22 @@ const HTML = /* html */ `<!DOCTYPE html>
         show('lastfm-username');
         show('lastfm-disconnect-btn');
         hide('lastfm-connect-btn');
-        const [as, npe, snp] = await Promise.all([
+        const [as, ss, npe, snp] = await Promise.all([
           fetch('/lastfm/auto-scrobble').then(r => r.json()),
+          fetch('/lastfm/sanitize-scrobble').then(r => r.json()),
           fetch('/lastfm/now-playing-enabled').then(r => r.json()),
           fetch('/lastfm/sanitize-now-playing').then(r => r.json()),
         ]);
         autoScrobbleEnabled = as.enabled;
+        sanitizeScrobble = ss.enabled;
         nowPlayingEnabled = npe.enabled;
         sanitizeNowPlaying = snp.enabled;
         document.getElementById('auto-scrobble-btn').textContent =
           'Auto-scrobble: ' + (autoScrobbleEnabled ? 'ON' : 'OFF');
         show('auto-scrobble-btn');
+        document.getElementById('sanitize-scrobble-btn').textContent =
+          'Sanitize tags: ' + (sanitizeScrobble ? 'ON' : 'OFF');
+        show('sanitize-scrobble-btn');
         document.getElementById('np-enabled-btn').textContent =
           'Update Last.fm: ' + (nowPlayingEnabled ? 'ON' : 'OFF');
         document.getElementById('np-sanitize-btn').textContent =
@@ -508,9 +515,11 @@ const HTML = /* html */ `<!DOCTYPE html>
         hide('lastfm-username');
         hide('lastfm-disconnect-btn');
         hide('auto-scrobble-btn');
+        hide('sanitize-scrobble-btn');
         hide('np-enabled-btn');
         hide('np-sanitize-btn');
         autoScrobbleEnabled = false;
+        sanitizeScrobble = true;
         nowPlayingEnabled = false;
         sanitizeNowPlaying = true;
         show('lastfm-connect-btn');
@@ -522,6 +531,15 @@ const HTML = /* html */ `<!DOCTYPE html>
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: !autoScrobbleEnabled }),
+      });
+      await refreshLastfmState();
+    });
+
+    document.getElementById('sanitize-scrobble-btn').addEventListener('click', async () => {
+      await fetch('/lastfm/sanitize-scrobble', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !sanitizeScrobble }),
       });
       await refreshLastfmState();
     });
