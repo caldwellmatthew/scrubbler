@@ -1,11 +1,11 @@
 import express from 'express';
+import path from 'path';
 import { config } from '../shared/config';
 import { authRouter } from './routes/auth';
 import { historyRouter } from './routes/history';
 import { pollRouter } from './routes/poll';
 import { explorerRouter } from './routes/explorer';
 import { lastfmRouter } from './routes/lastfm';
-import { uiRouter } from './routes/ui';
 import { errorHandler } from './middleware/errorHandler';
 import * as tokenRepo from '../shared/repositories/tokenRepo';
 import * as lastfmRepo from '../shared/repositories/lastfmRepo';
@@ -67,14 +67,22 @@ app.post('/now-playing/push', async (_req, res, next) => {
 });
 
 // Routes
-app.use('/', uiRouter);
 app.use('/auth', authRouter);
 app.use('/history', historyRouter);
 app.use('/poll', pollRouter);
 app.use('/explorer', explorerRouter);
 app.use('/lastfm', lastfmRouter);
 
-// 404 handler
+// Production: serve Vite-built client
+if (process.env.NODE_ENV === 'production') {
+  const clientDir = path.join(__dirname, '../client');
+  app.use(express.static(clientDir));
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(clientDir, 'index.html'));
+  });
+}
+
+// 404 handler (only reached in dev or for unknown API paths)
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });
 });

@@ -26,4 +26,5 @@ export const config = {
   lastfmApiKey: optionalEnv('LASTFM_API_KEY', ''),
   lastfmApiSecret: optionalEnv('LASTFM_API_SECRET', ''),
   lastfmEnabled,
+  clientOrigin: optionalEnv('CLIENT_ORIGIN', ''),
 };

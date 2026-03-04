@@ -57,7 +57,7 @@ lastfmRouter.get('/callback', async (req, res, next) => {
     const { username, sessionKey } = await lastfmAuth.getSession(token);
     await lastfmRepo.upsertSession(username, sessionKey);
     console.log(`[lastfm] Connected Last.fm user: ${username}`);
-    res.redirect('/');
+    res.redirect(config.clientOrigin + '/');
   } catch (err) {
     next(err);
   }
