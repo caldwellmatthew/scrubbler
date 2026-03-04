@@ -10,6 +10,7 @@ export interface HistoryItem {
   id: string;
   playedAt: string;
   scrobbledAt: string | null;
+  scrobbleSanitized: boolean | null;
   track: Track;
 }
 
