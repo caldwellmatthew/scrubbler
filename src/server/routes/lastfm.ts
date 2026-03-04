@@ -4,6 +4,7 @@ import * as lastfmAuth from '../../shared/lastfm/auth';
 import * as lastfmClient from '../../shared/lastfm/client';
 import * as lastfmRepo from '../../shared/repositories/lastfmRepo';
 import * as historyRepo from '../../shared/repositories/historyRepo';
+import { cleanName } from '../../shared/lastfm/clean';
 
 export const lastfmRouter = Router();
 
@@ -69,6 +70,34 @@ lastfmRouter.post('/disconnect', async (_req, res, next) => {
   }
 });
 
+lastfmRouter.post('/preview', async (req, res, next) => {
+  try {
+    if (!config.lastfmEnabled) {
+      res.status(503).json({ error: 'Last.fm not configured' });
+      return;
+    }
+    const { ids } = req.body as { ids: number[] };
+    if (!Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ error: 'ids must be a non-empty array' });
+      return;
+    }
+    const rows = await historyRepo.getByIds(ids);
+    rows.sort((a, b) => a.playedAt.getTime() - b.playedAt.getTime());
+    const items = rows.map((row) => ({
+      id: row.id,
+      playedAt: row.playedAt,
+      artist: row.artistName.split(', ')[0],
+      track: cleanName(row.name),
+      album: cleanName(row.albumName),
+      originalTrack: row.name,
+      originalAlbum: row.albumName,
+    }));
+    res.json({ items });
+  } catch (err) {
+    next(err);
+  }
+});
+
 lastfmRouter.post('/scrobble', async (req, res, next) => {
   try {
     if (!config.lastfmEnabled) {
@@ -80,7 +109,10 @@ lastfmRouter.post('/scrobble', async (req, res, next) => {
       res.status(401).json({ error: 'Not connected to Last.fm' });
       return;
     }
-    const { ids } = req.body as { ids: number[] };
+    const { ids, overrides = {} } = req.body as {
+      ids: number[];
+      overrides?: Record<string, { track?: string; album?: string }>;
+    };
     if (!Array.isArray(ids) || ids.length === 0) {
       res.status(400).json({ error: 'ids must be a non-empty array' });
       return;
@@ -88,8 +120,8 @@ lastfmRouter.post('/scrobble', async (req, res, next) => {
     const rows = await historyRepo.getByIds(ids);
     const items: lastfmClient.ScrobbleItem[] = rows.map((row) => ({
       artist: row.artistName.split(', ')[0],
-      track: row.name,
-      album: row.albumName,
+      track: overrides[row.id]?.track ?? cleanName(row.name),
+      album: overrides[row.id]?.album ?? cleanName(row.albumName),
       timestamp: Math.floor(row.playedAt.getTime() / 1000),
       duration: Math.floor(row.durationMs / 1000),
     }));
