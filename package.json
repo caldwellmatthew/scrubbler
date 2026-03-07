@@ -12,7 +12,7 @@
     "build:client": "vite build",
     "start:server": "NODE_ENV=production node dist/server/index.js",
     "start:worker": "node dist/worker/index.js",
-    "migrate": "psql $DATABASE_URL -f migrations/001_initial.sql",
+    "migrate": "cat migrations/*.sql | psql $DATABASE_URL",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.client.json"
   },
   "dependencies": {
