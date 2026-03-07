@@ -14,24 +14,27 @@ Three pieces share one PostgreSQL database:
 ## Quick Start
 
 ```bash
-# 1. Start PostgreSQL (schema applied automatically on first start)
+# 1. Start PostgreSQL
 docker compose up -d
 
-# 2. Configure environment
+# 2. Apply database migrations
+npm run migrate
+
+# 3. Configure environment
 cp .env.example .env
 # Required: SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, OAUTH_STATE_SECRET
 # Optional: LASTFM_API_KEY, LASTFM_API_SECRET (for scrobbling)
 # Dev only: CLIENT_ORIGIN=http://localhost:5173
 
-# 3. Install dependencies
+# 4. Install dependencies
 npm install
 
-# 4. Start all three processes (in separate terminals)
+# 5. Start all three processes (in separate terminals)
 npm run dev:server
 npm run dev:worker
 npm run dev:client
 
-# 5. Authenticate via browser (must use 127.0.0.1, not localhost — Spotify API restriction)
+# 6. Authenticate via browser (must use 127.0.0.1, not localhost — Spotify API restriction)
 open http://localhost:5173/auth/login
 ```
 
