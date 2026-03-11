@@ -4,6 +4,7 @@ import { config } from '../../shared/config';
 import { exchangeCode } from '../../shared/spotify/auth';
 import { fetchUserProfile } from '../../shared/spotify/client';
 import * as tokenRepo from '../../shared/repositories/tokenRepo';
+import { requireAuth } from '../middleware/auth';
 
 export const authRouter = Router();
 
@@ -40,9 +41,22 @@ setInterval(() => {
 const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
 const SCOPES = ['user-read-recently-played', 'user-read-currently-playing', 'user-read-playback-state', 'user-read-private', 'user-read-email'].join(' ');
 
-authRouter.get('/status', async (_req, res, next) => {
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  signed: true,
+  sameSite: 'lax' as const,
+  secure: config.nodeEnv === 'production',
+  maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+};
+
+authRouter.get('/status', async (req, res, next) => {
   try {
-    const token = await tokenRepo.getFirst();
+    const uid = req.signedCookies?.uid as string | undefined;
+    if (!uid) {
+      res.json({ authenticated: false });
+      return;
+    }
+    const token = await tokenRepo.getBySpotifyUserId(uid);
     if (token) {
       res.json({
         authenticated: true,
@@ -57,10 +71,12 @@ authRouter.get('/status', async (_req, res, next) => {
   }
 });
 
-authRouter.post('/logout', async (_req, res, next) => {
+authRouter.post('/logout', requireAuth, async (req, res, next) => {
   try {
-    await tokenRepo.deleteAll();
-    console.log('[auth] User logged out');
+    await tokenRepo.deleteBySpotifyUserId(req.user!.spotifyUserId);
+    const { maxAge: _, ...clearOptions } = COOKIE_OPTIONS;
+    res.clearCookie('uid', clearOptions);
+    console.log('[auth] User logged out:', req.user!.spotifyUserId);
     res.json({ ok: true });
   } catch (err) {
     next(err);
@@ -116,6 +132,9 @@ authRouter.get('/callback', async (req, res, next) => {
     );
 
     console.log(`[auth] Successfully authenticated Spotify user: ${profile.id}`);
+
+    // Set signed cookie so future requests are user-scoped
+    res.cookie('uid', profile.id, COOKIE_OPTIONS);
 
     res.redirect(config.clientOrigin + '/');
   } catch (err) {

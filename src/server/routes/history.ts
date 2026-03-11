@@ -39,7 +39,7 @@ historyRouter.get('/', async (req, res, next) => {
       return;
     }
 
-    const rows = await queryHistory(params);
+    const rows = await queryHistory(params, req.user!.spotifyUserId);
 
     res.json({
       items: rows.map((row) => ({

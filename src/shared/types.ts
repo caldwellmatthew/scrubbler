@@ -54,7 +54,7 @@ export interface LastfmSession {
 }
 
 export interface PollState {
-  id: 1;
+  spotifyUserId: string;
   lastPlayedAtMs: number | null;
   lastPolledAt: Date | null;
   pollEnabled: boolean;

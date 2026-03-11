@@ -1,4 +1,5 @@
 import express from 'express';
+import cookieParser from 'cookie-parser';
 import path from 'path';
 import { config } from '../shared/config';
 import { authRouter } from './routes/auth';
@@ -7,6 +8,7 @@ import { pollRouter } from './routes/poll';
 import { explorerRouter } from './routes/explorer';
 import { lastfmRouter } from './routes/lastfm';
 import { errorHandler } from './middleware/errorHandler';
+import { requireAuth } from './middleware/auth';
 import * as tokenRepo from '../shared/repositories/tokenRepo';
 import * as lastfmRepo from '../shared/repositories/lastfmRepo';
 import * as lastfmClient from '../shared/lastfm/client';
@@ -16,16 +18,24 @@ import { cleanName } from '../shared/lastfm/clean';
 const app = express();
 
 app.use(express.json());
+app.use(cookieParser(config.oauthStateSecret));
 
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Auth routes (no auth required — handles login/callback/status/logout)
+app.use('/auth', authRouter);
+
 // Now playing
-app.get('/now-playing', async (_req, res) => {
+app.get('/now-playing', requireAuth, async (req, res) => {
   try {
-    const [token, session] = await Promise.all([tokenRepo.getFirst(), lastfmRepo.getSession()]);
+    const { spotifyUserId } = req.user!;
+    const [token, session] = await Promise.all([
+      tokenRepo.getBySpotifyUserId(spotifyUserId),
+      lastfmRepo.getSession(spotifyUserId),
+    ]);
     if (!token) { res.json({ isPlaying: false, track: null }); return; }
     const data = await fetchCurrentlyPlaying(token);
     if (!data?.is_playing || !data.item) { res.json({ isPlaying: false, track: null }); return; }
@@ -51,9 +61,13 @@ app.get('/now-playing', async (_req, res) => {
 });
 
 // Push current Spotify track to Last.fm now-playing
-app.post('/now-playing/push', async (_req, res) => {
+app.post('/now-playing/push', requireAuth, async (req, res) => {
   try {
-    const [token, session] = await Promise.all([tokenRepo.getFirst(), lastfmRepo.getSession()]);
+    const { spotifyUserId } = req.user!;
+    const [token, session] = await Promise.all([
+      tokenRepo.getBySpotifyUserId(spotifyUserId),
+      lastfmRepo.getSession(spotifyUserId),
+    ]);
     if (!token || !session?.nowPlayingEnabled) { res.json({ ok: false }); return; }
     const data = await fetchCurrentlyPlaying(token);
     if (!data?.is_playing || !data.item) { res.json({ ok: false }); return; }
@@ -72,12 +86,11 @@ app.post('/now-playing/push', async (_req, res) => {
   }
 });
 
-// Routes
-app.use('/auth', authRouter);
-app.use('/history', historyRouter);
-app.use('/poll', pollRouter);
-app.use('/explorer', explorerRouter);
-app.use('/lastfm', lastfmRouter);
+// Protected routes
+app.use('/history', requireAuth, historyRouter);
+app.use('/poll', requireAuth, pollRouter);
+app.use('/explorer', requireAuth, explorerRouter);
+app.use('/lastfm', requireAuth, lastfmRouter);
 
 // Production: serve Vite-built client
 if (process.env.NODE_ENV === 'production') {

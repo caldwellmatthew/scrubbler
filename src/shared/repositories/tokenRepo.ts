@@ -37,15 +37,21 @@ export async function upsertToken(
   return rowToToken(result.rows[0]);
 }
 
-export async function getFirst(): Promise<OAuthToken | null> {
+export async function getBySpotifyUserId(spotifyUserId: string): Promise<OAuthToken | null> {
   const pool = getPool();
-  const result = await pool.query('SELECT * FROM oauth_tokens LIMIT 1');
+  const result = await pool.query('SELECT * FROM oauth_tokens WHERE spotify_user_id = $1', [spotifyUserId]);
   return result.rows.length > 0 ? rowToToken(result.rows[0]) : null;
 }
 
-export async function deleteAll(): Promise<void> {
+export async function getAll(): Promise<OAuthToken[]> {
   const pool = getPool();
-  await pool.query('DELETE FROM oauth_tokens');
+  const result = await pool.query('SELECT * FROM oauth_tokens');
+  return result.rows.map(rowToToken);
+}
+
+export async function deleteBySpotifyUserId(spotifyUserId: string): Promise<void> {
+  const pool = getPool();
+  await pool.query('DELETE FROM oauth_tokens WHERE spotify_user_id = $1', [spotifyUserId]);
 }
 
 export async function updateTokens(

@@ -19,6 +19,7 @@ const lastfmEnabled = !!(process.env['LASTFM_API_KEY'] && process.env['LASTFM_AP
 export const config = {
   spotifyClientId: requireEnv('SPOTIFY_CLIENT_ID'),
   spotifyClientSecret: requireEnv('SPOTIFY_CLIENT_SECRET'),
+  oauthStateSecret: requireEnv('OAUTH_STATE_SECRET'),
   databaseUrl: requireEnv('DATABASE_URL'),
   port: parseInt(optionalEnv('PORT', '3000'), 10),
   pollIntervalMs: parseInt(optionalEnv('POLL_INTERVAL_MS', '60000'), 10),

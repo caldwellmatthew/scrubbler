@@ -2,38 +2,46 @@ import { getPool } from '../db';
 import type { PoolClient } from 'pg';
 import type { HistoryQueryParams, ListenEvent, ListenHistoryRow, PollState } from '../types';
 
-export async function getPollState(): Promise<PollState> {
+export async function getPollState(spotifyUserId: string): Promise<PollState> {
   const pool = getPool();
-  const result = await pool.query('SELECT * FROM poll_state WHERE id = 1');
-  const row = result.rows[0];
-  if (!row) {
-    throw new Error('poll_state seed row missing — re-run migrations');
+  const result = await pool.query('SELECT * FROM poll_state WHERE spotify_user_id = $1', [spotifyUserId]);
+  if (result.rows.length === 0) {
+    // Return default state for a user who hasn't polled yet
+    return {
+      spotifyUserId,
+      lastPlayedAtMs: null,
+      lastPolledAt: null,
+      pollEnabled: true,
+    };
   }
+  const row = result.rows[0];
   return {
-    id: 1,
+    spotifyUserId: row.spotify_user_id as string,
     lastPlayedAtMs: row.last_played_at_ms as number | null,
     lastPolledAt: row.last_polled_at as Date | null,
     pollEnabled: row.poll_enabled as boolean,
   };
 }
 
-export async function getLastPlayedAtMs(): Promise<number | null> {
-  const state = await getPollState();
-  return state.lastPlayedAtMs;
-}
-
-export async function setPollEnabled(enabled: boolean): Promise<void> {
-  const pool = getPool();
-  await pool.query('UPDATE poll_state SET poll_enabled = $1 WHERE id = 1', [enabled]);
-}
-
-export async function updatePollState(lastPlayedAtMs: number | null): Promise<void> {
+export async function setPollEnabled(spotifyUserId: string, enabled: boolean): Promise<void> {
   const pool = getPool();
   await pool.query(
-    `UPDATE poll_state
-     SET last_played_at_ms = COALESCE($1, last_played_at_ms), last_polled_at = NOW()
-     WHERE id = 1`,
-    [lastPlayedAtMs],
+    `INSERT INTO poll_state (spotify_user_id, poll_enabled)
+     VALUES ($1, $2)
+     ON CONFLICT (spotify_user_id) DO UPDATE SET poll_enabled = EXCLUDED.poll_enabled`,
+    [spotifyUserId, enabled],
+  );
+}
+
+export async function updatePollState(spotifyUserId: string, lastPlayedAtMs: number | null): Promise<void> {
+  const pool = getPool();
+  await pool.query(
+    `INSERT INTO poll_state (spotify_user_id, last_played_at_ms, last_polled_at)
+     VALUES ($1, $2, NOW())
+     ON CONFLICT (spotify_user_id) DO UPDATE SET
+       last_played_at_ms = COALESCE(EXCLUDED.last_played_at_ms, poll_state.last_played_at_ms),
+       last_polled_at    = NOW()`,
+    [spotifyUserId, lastPlayedAtMs],
   );
 }
 
@@ -52,14 +60,14 @@ export async function insertMany(events: ListenEvent[], client?: PoolClient): Pr
   const result = await pool.query(
     `INSERT INTO listen_history (spotify_track_id, spotify_user_id, played_at)
      VALUES ${placeholders.join(', ')}
-     ON CONFLICT (spotify_track_id, played_at) DO NOTHING`,
+     ON CONFLICT (spotify_user_id, spotify_track_id, played_at) DO NOTHING`,
     values,
   );
 
   return result.rowCount ?? 0;
 }
 
-export async function queryHistory(params: HistoryQueryParams): Promise<ListenHistoryRow[]> {
+export async function queryHistory(params: HistoryQueryParams, spotifyUserId: string): Promise<ListenHistoryRow[]> {
   const pool = getPool();
 
   const limit = Math.min(params.limit ?? 50, 200);
@@ -67,6 +75,9 @@ export async function queryHistory(params: HistoryQueryParams): Promise<ListenHi
 
   const conditions: string[] = [];
   const values: unknown[] = [];
+
+  values.push(spotifyUserId);
+  conditions.push(`lh.spotify_user_id = $${values.length}`);
 
   if (params.before) {
     values.push(params.before);
@@ -83,7 +94,7 @@ export async function queryHistory(params: HistoryQueryParams): Promise<ListenHi
     conditions.push(`lh.spotify_track_id = $${values.length}`);
   }
 
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const where = `WHERE ${conditions.join(' AND ')}`;
 
   values.push(limit, offset);
   const limitClause = `LIMIT $${values.length - 1} OFFSET $${values.length}`;
@@ -132,7 +143,7 @@ function mapRow(row: Record<string, unknown>): ListenHistoryRow {
   };
 }
 
-export async function getByIds(ids: string[]): Promise<ListenHistoryRow[]> {
+export async function getByIds(ids: string[], spotifyUserId: string): Promise<ListenHistoryRow[]> {
   if (ids.length === 0) return [];
   const pool = getPool();
   const result = await pool.query(
@@ -152,13 +163,13 @@ export async function getByIds(ids: string[]): Promise<ListenHistoryRow[]> {
        t.image_url
      FROM listen_history lh
      JOIN tracks t ON t.spotify_track_id = lh.spotify_track_id
-     WHERE lh.id = ANY($1)`,
-    [ids],
+     WHERE lh.id = ANY($1) AND lh.spotify_user_id = $2`,
+    [ids, spotifyUserId],
   );
   return result.rows.map(mapRow);
 }
 
-export async function getUnscrobbledByPlayedAts(playedAts: Date[]): Promise<ListenHistoryRow[]> {
+export async function getUnscrobbledByPlayedAts(spotifyUserId: string, playedAts: Date[]): Promise<ListenHistoryRow[]> {
   if (playedAts.length === 0) return [];
   const pool = getPool();
   const result = await pool.query(
@@ -167,8 +178,8 @@ export async function getUnscrobbledByPlayedAts(playedAts: Date[]): Promise<List
             t.external_url, t.preview_url, t.image_url
      FROM listen_history lh
      JOIN tracks t ON t.spotify_track_id = lh.spotify_track_id
-     WHERE lh.played_at = ANY($1) AND lh.scrobbled_at IS NULL`,
-    [playedAts],
+     WHERE lh.spotify_user_id = $1 AND lh.played_at = ANY($2) AND lh.scrobbled_at IS NULL`,
+    [spotifyUserId, playedAts],
   );
   return result.rows.map(mapRow);
 }

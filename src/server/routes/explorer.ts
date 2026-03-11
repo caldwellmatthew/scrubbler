@@ -20,7 +20,7 @@ explorerRouter.get('/proxy', async (req, res, next) => {
       return;
     }
 
-    const token = await tokenRepo.getFirst();
+    const token = await tokenRepo.getBySpotifyUserId(req.user!.spotifyUserId);
     if (!token) {
       res.status(401).json({ error: 'Not authenticated — complete OAuth first' });
       return;

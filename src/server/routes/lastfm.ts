@@ -13,13 +13,13 @@ export const lastfmRouter = Router();
 const LASTFM_AUTH_URL = 'https://www.last.fm/api/auth/';
 
 
-lastfmRouter.get('/status', async (_req, res, next) => {
+lastfmRouter.get('/status', async (req, res, next) => {
   try {
     if (!config.lastfmEnabled) {
       res.json({ enabled: false, connected: false });
       return;
     }
-    const session = await lastfmRepo.getSession();
+    const session = await lastfmRepo.getSession(req.user!.spotifyUserId);
     if (session) {
       res.json({ enabled: true, connected: true, username: session.username });
     } else {
@@ -54,27 +54,28 @@ lastfmRouter.get('/callback', async (req, res, next) => {
       res.status(400).json({ error: 'Missing token in callback' });
       return;
     }
+    const { spotifyUserId } = req.user!;
     const { username, sessionKey } = await lastfmAuth.getSession(token);
-    await lastfmRepo.upsertSession(username, sessionKey);
-    console.log(`[lastfm] Connected Last.fm user: ${username}`);
+    await lastfmRepo.upsertSession(spotifyUserId, username, sessionKey);
+    console.log(`[lastfm] Connected Last.fm user: ${username} for Spotify user: ${spotifyUserId}`);
     res.redirect(config.clientOrigin + '/');
   } catch (err) {
     next(err);
   }
 });
 
-lastfmRouter.post('/disconnect', async (_req, res, next) => {
+lastfmRouter.post('/disconnect', async (req, res, next) => {
   try {
-    await lastfmRepo.deleteAll();
+    await lastfmRepo.deleteBySpotifyUserId(req.user!.spotifyUserId);
     res.json({ ok: true });
   } catch (err) {
     next(err);
   }
 });
 
-lastfmRouter.get('/auto-scrobble', async (_req, res, next) => {
+lastfmRouter.get('/auto-scrobble', async (req, res, next) => {
   try {
-    const session = await lastfmRepo.getSession();
+    const session = await lastfmRepo.getSession(req.user!.spotifyUserId);
     res.json({ enabled: session?.autoScrobbleEnabled ?? false });
   } catch (err) { next(err); }
 });
@@ -82,25 +83,26 @@ lastfmRouter.get('/auto-scrobble', async (_req, res, next) => {
 lastfmRouter.post('/auto-scrobble', async (req, res, next) => {
   try {
     const { enabled } = req.body as { enabled: boolean };
-    await lastfmRepo.setAutoScrobble(enabled);
+    await lastfmRepo.setAutoScrobble(req.user!.spotifyUserId, enabled);
     res.json({ ok: true, enabled });
   } catch (err) { next(err); }
 });
 
-lastfmRouter.get('/now-playing-enabled', async (_req, res, next) => {
+lastfmRouter.get('/now-playing-enabled', async (req, res, next) => {
   try {
-    const session = await lastfmRepo.getSession();
+    const session = await lastfmRepo.getSession(req.user!.spotifyUserId);
     res.json({ enabled: session?.nowPlayingEnabled ?? false });
   } catch (err) { next(err); }
 });
 
 lastfmRouter.post('/now-playing-enabled', async (req, res, next) => {
   try {
+    const { spotifyUserId } = req.user!;
     const { enabled } = req.body as { enabled: boolean };
-    await lastfmRepo.setNowPlayingEnabled(enabled);
+    await lastfmRepo.setNowPlayingEnabled(spotifyUserId, enabled);
     if (enabled) {
-      const session = await lastfmRepo.getSession();
-      const token = await tokenRepo.getFirst();
+      const session = await lastfmRepo.getSession(spotifyUserId);
+      const token = await tokenRepo.getBySpotifyUserId(spotifyUserId);
       if (session && token) {
         const nowPlaying = await fetchCurrentlyPlaying(token);
         if (nowPlaying?.is_playing && nowPlaying.item) {
@@ -119,9 +121,9 @@ lastfmRouter.post('/now-playing-enabled', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-lastfmRouter.get('/sanitize-scrobble', async (_req, res, next) => {
+lastfmRouter.get('/sanitize-scrobble', async (req, res, next) => {
   try {
-    const session = await lastfmRepo.getSession();
+    const session = await lastfmRepo.getSession(req.user!.spotifyUserId);
     res.json({ enabled: session?.sanitizeScrobble ?? true });
   } catch (err) { next(err); }
 });
@@ -129,14 +131,14 @@ lastfmRouter.get('/sanitize-scrobble', async (_req, res, next) => {
 lastfmRouter.post('/sanitize-scrobble', async (req, res, next) => {
   try {
     const { enabled } = req.body as { enabled: boolean };
-    await lastfmRepo.setSanitizeScrobble(enabled);
+    await lastfmRepo.setSanitizeScrobble(req.user!.spotifyUserId, enabled);
     res.json({ ok: true, enabled });
   } catch (err) { next(err); }
 });
 
-lastfmRouter.get('/sanitize-now-playing', async (_req, res, next) => {
+lastfmRouter.get('/sanitize-now-playing', async (req, res, next) => {
   try {
-    const session = await lastfmRepo.getSession();
+    const session = await lastfmRepo.getSession(req.user!.spotifyUserId);
     res.json({ enabled: session?.sanitizeNowPlaying ?? true });
   } catch (err) { next(err); }
 });
@@ -144,7 +146,7 @@ lastfmRouter.get('/sanitize-now-playing', async (_req, res, next) => {
 lastfmRouter.post('/sanitize-now-playing', async (req, res, next) => {
   try {
     const { enabled } = req.body as { enabled: boolean };
-    await lastfmRepo.setSanitizeNowPlaying(enabled);
+    await lastfmRepo.setSanitizeNowPlaying(req.user!.spotifyUserId, enabled);
     res.json({ ok: true, enabled });
   } catch (err) { next(err); }
 });
@@ -160,7 +162,7 @@ lastfmRouter.post('/preview', async (req, res, next) => {
       res.status(400).json({ error: 'ids must be a non-empty array' });
       return;
     }
-    const rows = await historyRepo.getByIds(ids);
+    const rows = await historyRepo.getByIds(ids, req.user!.spotifyUserId);
     rows.sort((a, b) => a.playedAt.getTime() - b.playedAt.getTime());
     const items = rows.map((row) => ({
       id: row.id,
@@ -183,7 +185,8 @@ lastfmRouter.post('/scrobble', async (req, res, next) => {
       res.status(503).json({ error: 'Last.fm not configured' });
       return;
     }
-    const session = await lastfmRepo.getSession();
+    const { spotifyUserId } = req.user!;
+    const session = await lastfmRepo.getSession(spotifyUserId);
     if (!session) {
       res.status(401).json({ error: 'Not connected to Last.fm' });
       return;
@@ -196,7 +199,7 @@ lastfmRouter.post('/scrobble', async (req, res, next) => {
       res.status(400).json({ error: 'ids must be a non-empty array' });
       return;
     }
-    const rows = await historyRepo.getByIds(ids);
+    const rows = await historyRepo.getByIds(ids, spotifyUserId);
     const items: lastfmClient.ScrobbleItem[] = rows.map((row) => ({
       artist: row.artistName.split(', ')[0],
       track: overrides[String(row.id)]?.track ?? cleanName(row.name),
