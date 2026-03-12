@@ -14,7 +14,7 @@ import * as lastfmRepo from '../shared/repositories/lastfmRepo';
 import * as lastfmClient from '../shared/lastfm/client';
 import { fetchCurrentlyPlaying } from '../shared/spotify/client';
 import { cleanName } from '../shared/lastfm/clean';
-import { checkConnection } from '../shared/db';
+import { checkConnection, isDbConnectionError, dbErrorMessage } from '../shared/db';
 
 const app = express();
 
@@ -61,6 +61,7 @@ app.get('/now-playing', requireAuth, async (req, res) => {
       },
     });
   } catch (err) {
+    if (isDbConnectionError(err)) { res.status(503).json({ error: 'Database unavailable' }); return; }
     console.error('[server] now-playing error:', err instanceof Error ? err.message : err);
     res.json({ isPlaying: false, track: null, error: err instanceof Error ? err.message : 'Unknown error' });
   }
@@ -87,6 +88,7 @@ app.post('/now-playing/push', requireAuth, async (req, res) => {
     }, session.sessionKey);
     res.json({ ok: true });
   } catch (err) {
+    if (isDbConnectionError(err)) { res.status(503).json({ error: 'Database unavailable' }); return; }
     console.error('[server] now-playing/push error:', err instanceof Error ? err.message : err);
     res.json({ ok: false });
   }
@@ -123,7 +125,7 @@ checkConnection()
     });
   })
   .catch((err) => {
-    console.error(`[server] Failed to connect to database: ${err instanceof Error ? err.message : err}`);
+    console.error(`[server] Failed to connect to database: ${dbErrorMessage(err)}`);
     console.error('[server] Is PostgreSQL running? Check DATABASE_URL in your .env');
     process.exit(1);
   });

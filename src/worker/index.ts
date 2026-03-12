@@ -1,12 +1,16 @@
 import { config } from '../shared/config';
-import { checkConnection } from '../shared/db';
+import { checkConnection, isDbConnectionError, dbErrorMessage } from '../shared/db';
 import { poll } from './poller';
 
 async function runPoll(): Promise<void> {
   try {
     await poll();
   } catch (err) {
-    console.error('[worker] Poll failed:', err);
+    if (isDbConnectionError(err)) {
+      console.error('[worker] Database unavailable, will retry next interval:', dbErrorMessage(err));
+    } else {
+      console.error('[worker] Poll failed:', err);
+    }
   }
 }
 
@@ -17,7 +21,7 @@ checkConnection()
     setInterval(runPoll, config.pollIntervalMs);
   })
   .catch((err) => {
-    console.error(`[worker] Failed to connect to database: ${err instanceof Error ? err.message : err}`);
+    console.error(`[worker] Failed to connect to database: ${dbErrorMessage(err)}`);
     console.error('[worker] Is PostgreSQL running? Check DATABASE_URL in your .env');
     process.exit(1);
   });
