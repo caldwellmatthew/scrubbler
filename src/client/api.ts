@@ -6,7 +6,7 @@ export class ApiError extends Error {
   }
 }
 
-async function parseResponse<T>(res: Response): Promise<T> {
+async function checkResponse(res: Response): Promise<void> {
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
     try {
@@ -15,97 +15,105 @@ async function parseResponse<T>(res: Response): Promise<T> {
     } catch { /* ignore parse failure */ }
     throw new ApiError(res.status, message);
   }
+}
+
+async function get<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  await checkResponse(res);
   return res.json();
 }
 
-function post(url: string, body?: unknown): Promise<Response> {
-  return fetch(url, {
+async function post<T = void>(url: string, body?: unknown): Promise<T> {
+  const res = await fetch(url, {
     method: 'POST',
     ...(body !== undefined ? {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     } : {}),
   });
+  await checkResponse(res);
+  const text = await res.text();
+  return text ? JSON.parse(text) : (undefined as T);
 }
 
-export function getAuthStatus(): Promise<AuthStatus> {
-  return fetch('/auth/status').then(r => parseResponse(r));
+export async function getAuthStatus(): Promise<AuthStatus> {
+  return get('/auth/status');
 }
 
-export function logout(): Promise<void> {
-  return post('/auth/logout').then(r => { if (!r.ok) throw new ApiError(r.status, 'Logout failed'); });
+export async function logout(): Promise<void> {
+  await post('/auth/logout');
 }
 
-export function getPollState(): Promise<PollState> {
-  return fetch('/poll').then(r => parseResponse(r));
+export async function getPollState(): Promise<PollState> {
+  return get('/poll');
 }
 
-export function togglePoll(action: 'start' | 'stop'): Promise<void> {
-  return post('/poll/' + action).then(r => { if (!r.ok) throw new ApiError(r.status, 'Toggle poll failed'); });
+export async function togglePoll(action: 'start' | 'stop'): Promise<void> {
+  await post('/poll/' + action);
 }
 
-export function getLastfmStatus(): Promise<LastfmStatus> {
-  return fetch('/lastfm/status').then(r => parseResponse(r));
+export async function getLastfmStatus(): Promise<LastfmStatus> {
+  return get('/lastfm/status');
 }
 
-export function getAutoScrobble(): Promise<ToggleState> {
-  return fetch('/lastfm/auto-scrobble').then(r => parseResponse(r));
+export async function getAutoScrobble(): Promise<ToggleState> {
+  return get('/lastfm/auto-scrobble');
 }
 
-export function setAutoScrobble(enabled: boolean): Promise<void> {
-  return post('/lastfm/auto-scrobble', { enabled }).then(r => { if (!r.ok) throw new ApiError(r.status, 'Failed'); });
+export async function setAutoScrobble(enabled: boolean): Promise<void> {
+  await post('/lastfm/auto-scrobble', { enabled });
 }
 
-export function getSanitizeScrobble(): Promise<ToggleState> {
-  return fetch('/lastfm/sanitize-scrobble').then(r => parseResponse(r));
+export async function getSanitizeScrobble(): Promise<ToggleState> {
+  return get('/lastfm/sanitize-scrobble');
 }
 
-export function setSanitizeScrobble(enabled: boolean): Promise<void> {
-  return post('/lastfm/sanitize-scrobble', { enabled }).then(r => { if (!r.ok) throw new ApiError(r.status, 'Failed'); });
+export async function setSanitizeScrobble(enabled: boolean): Promise<void> {
+  await post('/lastfm/sanitize-scrobble', { enabled });
 }
 
-export function getNowPlayingEnabled(): Promise<ToggleState> {
-  return fetch('/lastfm/now-playing-enabled').then(r => parseResponse(r));
+export async function getNowPlayingEnabled(): Promise<ToggleState> {
+  return get('/lastfm/now-playing-enabled');
 }
 
-export function setNowPlayingEnabled(enabled: boolean): Promise<void> {
-  return post('/lastfm/now-playing-enabled', { enabled }).then(r => { if (!r.ok) throw new ApiError(r.status, 'Failed'); });
+export async function setNowPlayingEnabled(enabled: boolean): Promise<void> {
+  await post('/lastfm/now-playing-enabled', { enabled });
 }
 
-export function getSanitizeNowPlaying(): Promise<ToggleState> {
-  return fetch('/lastfm/sanitize-now-playing').then(r => parseResponse(r));
+export async function getSanitizeNowPlaying(): Promise<ToggleState> {
+  return get('/lastfm/sanitize-now-playing');
 }
 
-export function setSanitizeNowPlaying(enabled: boolean): Promise<void> {
-  return post('/lastfm/sanitize-now-playing', { enabled }).then(r => { if (!r.ok) throw new ApiError(r.status, 'Failed'); });
+export async function setSanitizeNowPlaying(enabled: boolean): Promise<void> {
+  await post('/lastfm/sanitize-now-playing', { enabled });
 }
 
-export function disconnectLastfm(): Promise<void> {
-  return post('/lastfm/disconnect').then(r => { if (!r.ok) throw new ApiError(r.status, 'Disconnect failed'); });
+export async function disconnectLastfm(): Promise<void> {
+  await post('/lastfm/disconnect');
 }
 
-export function getNowPlaying(): Promise<NowPlayingData> {
-  return fetch('/now-playing').then(r => parseResponse(r));
+export async function getNowPlaying(): Promise<NowPlayingData> {
+  return get('/now-playing');
 }
 
-export function pushNowPlaying(): Promise<void> {
-  return post('/now-playing/push').then(r => { if (!r.ok) throw new ApiError(r.status, 'Push failed'); });
+export async function pushNowPlaying(): Promise<void> {
+  await post('/now-playing/push');
 }
 
-export function getHistory(limit: number, offset: number): Promise<{ items: HistoryItem[] }> {
-  return fetch(`/history?limit=${limit}&offset=${offset}`).then(r => parseResponse(r));
+export async function getHistory(limit: number, offset: number): Promise<{ items: HistoryItem[] }> {
+  return get(`/history?limit=${limit}&offset=${offset}`);
 }
 
-export function getScrobblePreview(ids: string[]): Promise<{ items: PreviewItem[]; error?: string }> {
-  return post('/lastfm/preview', { ids }).then(r => parseResponse(r));
+export async function getScrobblePreview(ids: string[]): Promise<{ items: PreviewItem[]; error?: string }> {
+  return post('/lastfm/preview', { ids });
 }
 
-export function submitScrobble(ids: string[], overrides: Record<string, { track: string; album: string }>): Promise<{ ok: boolean; error?: string }> {
-  return post('/lastfm/scrobble', { ids, overrides }).then(r => parseResponse(r));
+export async function submitScrobble(ids: string[], overrides: Record<string, { track: string; album: string }>): Promise<{ ok: boolean; error?: string }> {
+  return post('/lastfm/scrobble', { ids, overrides });
 }
 
-export function proxySpotifyRequest(endpoint: string, query?: string): Promise<{ status: number; data: unknown }> {
+export async function proxySpotifyRequest(endpoint: string, query?: string): Promise<{ status: number; data: unknown }> {
   const params = new URLSearchParams(query || '');
   params.set('endpoint', endpoint);
-  return fetch('/explorer/proxy?' + params.toString()).then(r => parseResponse(r));
+  return get('/explorer/proxy?' + params.toString());
 }
