@@ -3,8 +3,8 @@ import * as trackRepo from '../shared/repositories/trackRepo';
 import * as historyRepo from '../shared/repositories/historyRepo';
 import * as lastfmRepo from '../shared/repositories/lastfmRepo';
 import * as lastfmClient from '../shared/lastfm/client';
+import { buildScrobbleItems, markScrobbledWithSanitizeInfo, buildNowPlayingPayload } from '../shared/lastfm/scrobble';
 import { fetchRecentlyPlayed, fetchCurrentlyPlaying } from '../shared/spotify/client';
-import { cleanName } from '../shared/lastfm/clean';
 import { getPool } from '../shared/db';
 import type { ListenEvent, OAuthToken, Track } from '../shared/types';
 import type { SpotifyPlayHistoryItem } from '../shared/types';
@@ -94,20 +94,9 @@ async function pollUser(token: OAuthToken): Promise<void> {
       const rows = await historyRepo.getUnscrobbledByPlayedAts(spotifyUserId, events.map(e => e.playedAt));
       if (rows.length > 0) {
         rows.sort((a, b) => a.playedAt.getTime() - b.playedAt.getTime());
-        const sanitize = session.sanitizeScrobble;
-        const scrobbleItems = rows.map(row => ({
-          artist: row.artistName.split(', ')[0],
-          track: sanitize ? cleanName(row.name) : row.name,
-          album: sanitize ? cleanName(row.albumName) : row.albumName,
-          timestamp: Math.floor(row.playedAt.getTime() / 1000),
-          duration: Math.floor(row.durationMs / 1000),
-        }));
+        const scrobbleItems = buildScrobbleItems(rows, { sanitize: session.sanitizeScrobble });
         await lastfmClient.scrobble(scrobbleItems, session.sessionKey);
-        // Mark each row with whether sanitization actually changed its values
-        const sanitizedIds = rows.filter(r => cleanName(r.name) !== r.name || cleanName(r.albumName) !== r.albumName).map(r => String(r.id));
-        const unsanitizedIds = rows.filter(r => cleanName(r.name) === r.name && cleanName(r.albumName) === r.albumName).map(r => String(r.id));
-        if (sanitizedIds.length > 0) await historyRepo.markScrobbled(sanitizedIds, true);
-        if (unsanitizedIds.length > 0) await historyRepo.markScrobbled(unsanitizedIds, false);
+        await markScrobbledWithSanitizeInfo(rows, scrobbleItems);
         console.log(`[worker] ${tag} Auto-scrobbled ${scrobbleItems.length} tracks to Last.fm`);
       }
     } catch (err) {
@@ -121,15 +110,10 @@ async function pollUser(token: OAuthToken): Promise<void> {
       const nowPlaying = await fetchCurrentlyPlaying(token);
       if (nowPlaying?.is_playing && nowPlaying.item) {
         const t = nowPlaying.item;
-        const sanitize = session.sanitizeNowPlaying;
+        const payload = buildNowPlayingPayload(t, session.sanitizeNowPlaying);
         console.log(`[worker] ${tag} Now playing: "${t.name}" by ${t.artists[0].name}`);
-        await lastfmClient.updateNowPlaying({
-          artist: t.artists[0].name,
-          track: sanitize ? cleanName(t.name) : t.name,
-          album: sanitize ? cleanName(t.album.name) : t.album.name,
-          duration: Math.floor(t.duration_ms / 1000),
-        }, session.sessionKey);
-        console.log(`[worker] ${tag} Sent now playing to Last.fm: "${sanitize ? cleanName(t.name) : t.name}" by ${t.artists[0].name}`);
+        await lastfmClient.updateNowPlaying(payload, session.sessionKey);
+        console.log(`[worker] ${tag} Sent now playing to Last.fm: "${payload.track}" by ${payload.artist}`);
       } else {
         console.log(`[worker] ${tag} Now playing: nothing (Spotify idle or no active device)`);
       }

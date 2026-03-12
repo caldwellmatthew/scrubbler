@@ -7,6 +7,7 @@ import * as historyRepo from '../../shared/repositories/historyRepo';
 import * as tokenRepo from '../../shared/repositories/tokenRepo';
 import { fetchCurrentlyPlaying } from '../../shared/spotify/client';
 import { cleanName } from '../../shared/lastfm/clean';
+import { buildScrobbleItems, markScrobbledWithSanitizeInfo, buildNowPlayingPayload } from '../../shared/lastfm/scrobble';
 
 export const lastfmRouter = Router();
 
@@ -106,14 +107,10 @@ lastfmRouter.post('/now-playing-enabled', async (req, res, next) => {
       if (session && token) {
         const nowPlaying = await fetchCurrentlyPlaying(token);
         if (nowPlaying?.is_playing && nowPlaying.item) {
-          const t = nowPlaying.item;
-          const sanitize = session.sanitizeNowPlaying;
-          await lastfmClient.updateNowPlaying({
-            artist: t.artists[0].name,
-            track: sanitize ? cleanName(t.name) : t.name,
-            album: sanitize ? cleanName(t.album.name) : t.album.name,
-            duration: Math.floor(t.duration_ms / 1000),
-          }, session.sessionKey);
+          await lastfmClient.updateNowPlaying(
+            buildNowPlayingPayload(nowPlaying.item, session.sanitizeNowPlaying),
+            session.sessionKey,
+          );
         }
       }
     }
@@ -200,19 +197,9 @@ lastfmRouter.post('/scrobble', async (req, res, next) => {
       return;
     }
     const rows = await historyRepo.getByIds(ids, spotifyUserId);
-    const items: lastfmClient.ScrobbleItem[] = rows.map((row) => ({
-      artist: row.artistName.split(', ')[0],
-      track: overrides[String(row.id)]?.track ?? cleanName(row.name),
-      album: overrides[String(row.id)]?.album ?? cleanName(row.albumName),
-      timestamp: Math.floor(row.playedAt.getTime() / 1000),
-      duration: Math.floor(row.durationMs / 1000),
-    }));
+    const items = buildScrobbleItems(rows, { overrides });
     await lastfmClient.scrobble(items, session.sessionKey);
-    // Mark each row sanitized only if the values actually sent differ from the originals
-    const sanitizedIds = rows.filter((row, i) => items[i].track !== row.name || items[i].album !== row.albumName).map(r => String(r.id));
-    const unsanitizedIds = rows.filter((row, i) => items[i].track === row.name && items[i].album === row.albumName).map(r => String(r.id));
-    if (sanitizedIds.length > 0) await historyRepo.markScrobbled(sanitizedIds, true);
-    if (unsanitizedIds.length > 0) await historyRepo.markScrobbled(unsanitizedIds, false);
+    await markScrobbledWithSanitizeInfo(rows, items);
     res.json({ ok: true, scrobbled: items.length });
   } catch (err) {
     next(err);

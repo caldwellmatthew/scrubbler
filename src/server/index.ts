@@ -14,6 +14,7 @@ import * as lastfmRepo from '../shared/repositories/lastfmRepo';
 import * as lastfmClient from '../shared/lastfm/client';
 import { fetchCurrentlyPlaying } from '../shared/spotify/client';
 import { cleanName } from '../shared/lastfm/clean';
+import { buildNowPlayingPayload } from '../shared/lastfm/scrobble';
 import { checkConnection, isDbConnectionError, dbErrorMessage } from '../shared/db';
 
 const app = express();
@@ -78,14 +79,10 @@ app.post('/now-playing/push', requireAuth, async (req, res) => {
     if (!token || !session?.nowPlayingEnabled) { res.json({ ok: false }); return; }
     const data = await fetchCurrentlyPlaying(token);
     if (!data?.is_playing || !data.item) { res.json({ ok: false }); return; }
-    const t = data.item;
-    const sanitize = session.sanitizeNowPlaying;
-    await lastfmClient.updateNowPlaying({
-      artist: t.artists[0].name,
-      track: sanitize ? cleanName(t.name) : t.name,
-      album: sanitize ? cleanName(t.album.name) : t.album.name,
-      duration: Math.floor(t.duration_ms / 1000),
-    }, session.sessionKey);
+    await lastfmClient.updateNowPlaying(
+      buildNowPlayingPayload(data.item, session.sanitizeNowPlaying),
+      session.sessionKey,
+    );
     res.json({ ok: true });
   } catch (err) {
     if (isDbConnectionError(err)) { res.status(503).json({ error: 'Database unavailable' }); return; }
