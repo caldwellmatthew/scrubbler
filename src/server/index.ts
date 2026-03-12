@@ -14,6 +14,7 @@ import * as lastfmRepo from '../shared/repositories/lastfmRepo';
 import * as lastfmClient from '../shared/lastfm/client';
 import { fetchCurrentlyPlaying } from '../shared/spotify/client';
 import { cleanName } from '../shared/lastfm/clean';
+import { checkConnection } from '../shared/db';
 
 const app = express();
 
@@ -21,8 +22,13 @@ app.use(express.json());
 app.use(cookieParser(config.oauthStateSecret));
 
 // Health check
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/health', async (_req, res) => {
+  try {
+    await checkConnection();
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  } catch {
+    res.status(503).json({ status: 'error', error: 'Database unavailable', timestamp: new Date().toISOString() });
+  }
 });
 
 // Auth routes (no auth required — handles login/callback/status/logout)
@@ -109,9 +115,17 @@ app.use((_req, res) => {
 // Error handler
 app.use(errorHandler);
 
-app.listen(config.port, () => {
-  console.log(`[server] Listening on http://localhost:${config.port}`);
-  console.log(`[server] OAuth login: http://localhost:${config.port}/auth/login`);
-});
+checkConnection()
+  .then(() => {
+    app.listen(config.port, () => {
+      console.log(`[server] Listening on http://localhost:${config.port}`);
+      console.log(`[server] OAuth login: http://localhost:${config.port}/auth/login`);
+    });
+  })
+  .catch((err) => {
+    console.error(`[server] Failed to connect to database: ${err instanceof Error ? err.message : err}`);
+    console.error('[server] Is PostgreSQL running? Check DATABASE_URL in your .env');
+    process.exit(1);
+  });
 
 export default app;

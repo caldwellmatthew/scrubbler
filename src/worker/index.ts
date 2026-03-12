@@ -1,9 +1,7 @@
 import { config } from '../shared/config';
+import { checkConnection } from '../shared/db';
 import { poll } from './poller';
 
-console.log(`[worker] Starting polling worker (interval=${config.pollIntervalMs}ms)`);
-
-// Run immediately on startup, then on every interval
 async function runPoll(): Promise<void> {
   try {
     await poll();
@@ -12,5 +10,14 @@ async function runPoll(): Promise<void> {
   }
 }
 
-runPoll();
-setInterval(runPoll, config.pollIntervalMs);
+checkConnection()
+  .then(() => {
+    console.log(`[worker] Starting polling worker (interval=${config.pollIntervalMs}ms)`);
+    runPoll();
+    setInterval(runPoll, config.pollIntervalMs);
+  })
+  .catch((err) => {
+    console.error(`[worker] Failed to connect to database: ${err instanceof Error ? err.message : err}`);
+    console.error('[worker] Is PostgreSQL running? Check DATABASE_URL in your .env');
+    process.exit(1);
+  });

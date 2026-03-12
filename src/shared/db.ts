@@ -14,6 +14,16 @@ export function getPool(): Pool {
   return pool;
 }
 
+/** Verify the database is reachable. Throws with a friendly message on failure. */
+export async function checkConnection(): Promise<void> {
+  const client = await getPool().connect();
+  try {
+    await client.query('SELECT 1');
+  } finally {
+    client.release();
+  }
+}
+
 export async function closePool(): Promise<void> {
   if (pool) {
     await pool.end();
