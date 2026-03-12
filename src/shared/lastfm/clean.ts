@@ -8,7 +8,7 @@ const KEYWORDS =
 
 const PAREN   = new RegExp(`\\s*\\([^)]*\\b(?:${KEYWORDS})\\b[^)]*\\)`, 'gi');
 const BRACKET = new RegExp(`\\s*\\[[^\\]]*\\b(?:${KEYWORDS})\\b[^\\]]*\\]`, 'gi');
-const DASH    = new RegExp(`\\s*[-–]\\s*(?:.*\\s+)?(?:${KEYWORDS})(?:\\s+\\d{4})?\\s*$`, 'gi');
+const DASH    = new RegExp(`\\s*[-–]\\s*(?:.*\\s+)?(?:${KEYWORDS})(?:\\s+(?:\\d{4}|\\w+))*\\s*$`, 'gi');
 
 export function cleanName(s: string): string {
   return s.replace(PAREN, '').replace(BRACKET, '').replace(DASH, '').trim();
