@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import * as api from './api';
+import { ApiError } from './api';
 import type { PollState, LastfmStatus, NowPlayingData, HistoryItem } from './types';
 import { useInterval } from './hooks/useInterval';
 import { Header } from './components/Header';
@@ -43,18 +44,41 @@ export function App() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewIds, setPreviewIds] = useState<string[]>([]);
 
+  // Connection error
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+
   const lastfmEnabled = lastfmStatus?.enabled ?? false;
   const lastfmConnected = lastfmStatus?.connected ?? false;
 
   // -- Refresh functions --
 
+  /** Run an async fn, clearing or setting connectionError based on result. */
+  function withConnectionTracking<T>(fn: () => Promise<T>): Promise<T | undefined> {
+    return fn().then((result) => {
+      setConnectionError(null);
+      return result;
+    }).catch((err) => {
+      if (err instanceof ApiError && err.status === 503) {
+        setConnectionError('Server is having trouble reaching the database.');
+      } else if (err instanceof TypeError && err.message === 'Failed to fetch') {
+        setConnectionError('Cannot reach the server.');
+      } else {
+        setConnectionError(null);
+        throw err;
+      }
+      return undefined;
+    });
+  }
+
   const refreshPollState = useCallback(async () => {
     if (!authenticated) return;
-    setPollState(await api.getPollState());
+    const result = await withConnectionTracking(() => api.getPollState());
+    if (result) setPollState(result);
   }, [authenticated]);
 
   const refreshLastfmState = useCallback(async () => {
-    const status = await api.getLastfmStatus();
+    const status = await withConnectionTracking(() => api.getLastfmStatus());
+    if (!status) return;
     setLastfmStatus(status);
     if (!status.enabled) return;
     if (status.connected) {
@@ -78,11 +102,12 @@ export function App() {
 
   const refreshNowPlaying = useCallback(async () => {
     if (!authenticated) return;
-    const data = await api.getNowPlaying();
+    const data = await withConnectionTracking(() => api.getNowPlaying());
+    if (!data) return;
     setNowPlaying(data);
     if (data.isPlaying && data.track) {
       if (nowPlayingEnabled && data.track.name !== currentTrackName.current) {
-        api.pushNowPlaying();
+        api.pushNowPlaying().catch(() => {});
       }
       currentTrackName.current = data.track.name;
     } else {
@@ -93,7 +118,8 @@ export function App() {
   const loadHistory = useCallback(async (reset: boolean) => {
     if (!authenticated) return;
     const newOffset = reset ? 0 : historyOffset;
-    const data = await api.getHistory(LIMIT, newOffset);
+    const data = await withConnectionTracking(() => api.getHistory(LIMIT, newOffset));
+    if (!data) return;
     if (reset) {
       setHistoryItems(data.items);
       setSelectedIds(new Set());
@@ -111,22 +137,25 @@ export function App() {
     async function init() {
       const ott = new URLSearchParams(window.location.search).get('ott');
       if (ott) {
-        await fetch(`/auth/finalize?ott=${ott}`);
+        try { await fetch(`/auth/finalize?ott=${ott}`); } catch { /* server down */ }
         window.history.replaceState({}, '', '/');
       }
-      const status = await api.getAuthStatus();
+      const status = await withConnectionTracking(() => api.getAuthStatus());
+      if (!status) return;
       setAuthenticated(status.authenticated);
       setDisplayName(status.displayName || status.spotifyUserId || '');
       if (!status.authenticated) return;
       await Promise.all([
-        api.getPollState().then(setPollState),
+        withConnectionTracking(() => api.getPollState()).then(r => { if (r) setPollState(r); }),
         refreshLastfmState(),
-        api.getNowPlaying().then((data) => {
+        withConnectionTracking(() => api.getNowPlaying()).then(data => {
+          if (!data) return;
           setNowPlaying(data);
           if (data.isPlaying && data.track) currentTrackName.current = data.track.name;
         }),
       ]);
-      const histData = await api.getHistory(LIMIT, 0);
+      const histData = await withConnectionTracking(() => api.getHistory(LIMIT, 0));
+      if (!histData) return;
       setHistoryItems(histData.items);
       setHistoryOffset(histData.items.length);
       setHasMore(histData.items.length >= LIMIT);
@@ -146,44 +175,58 @@ export function App() {
   // -- Handlers --
 
   async function handleTogglePoll() {
-    const action = pollState?.pollEnabled ? 'stop' : 'start';
-    await api.togglePoll(action);
-    await refreshPollState();
+    try {
+      const action = pollState?.pollEnabled ? 'stop' : 'start';
+      await api.togglePoll(action);
+      await refreshPollState();
+    } catch { setConnectionError('Failed to toggle polling.'); }
   }
 
   async function handleLogout() {
-    await api.logout();
-    setAuthenticated(false);
-    setDisplayName('');
-    setHistoryItems([]);
-    setHistoryOffset(0);
+    try {
+      await api.logout();
+      setAuthenticated(false);
+      setDisplayName('');
+      setHistoryItems([]);
+      setHistoryOffset(0);
+    } catch { setConnectionError('Failed to log out.'); }
   }
 
   async function handleToggleAutoScrobble() {
-    await api.setAutoScrobble(!autoScrobbleEnabled);
-    await refreshLastfmState();
+    try {
+      await api.setAutoScrobble(!autoScrobbleEnabled);
+      await refreshLastfmState();
+    } catch { setConnectionError('Failed to update auto-scrobble setting.'); }
   }
 
   async function handleToggleSanitizeScrobble() {
-    await api.setSanitizeScrobble(!sanitizeScrobble);
-    await refreshLastfmState();
+    try {
+      await api.setSanitizeScrobble(!sanitizeScrobble);
+      await refreshLastfmState();
+    } catch { setConnectionError('Failed to update sanitize setting.'); }
   }
 
   async function handleToggleNowPlaying() {
-    await api.setNowPlayingEnabled(!nowPlayingEnabled);
-    await refreshLastfmState();
-    await refreshNowPlaying();
+    try {
+      await api.setNowPlayingEnabled(!nowPlayingEnabled);
+      await refreshLastfmState();
+      await refreshNowPlaying();
+    } catch { setConnectionError('Failed to update now-playing setting.'); }
   }
 
   async function handleToggleSanitizeNowPlaying() {
-    await api.setSanitizeNowPlaying(!sanitizeNowPlaying);
-    await refreshLastfmState();
-    await refreshNowPlaying();
+    try {
+      await api.setSanitizeNowPlaying(!sanitizeNowPlaying);
+      await refreshLastfmState();
+      await refreshNowPlaying();
+    } catch { setConnectionError('Failed to update sanitize setting.'); }
   }
 
   async function handleDisconnectLastfm() {
-    await api.disconnectLastfm();
-    await refreshLastfmState();
+    try {
+      await api.disconnectLastfm();
+      await refreshLastfmState();
+    } catch { setConnectionError('Failed to disconnect Last.fm.'); }
   }
 
   function handleScrobble(ids: string[]) {
@@ -202,8 +245,15 @@ export function App() {
 
   return (
     <>
+      {connectionError && (
+        <div id="connection-error">
+          {connectionError}
+          <button onClick={() => setConnectionError(null)}>Dismiss</button>
+        </div>
+      )}
       <Header
         authenticated={authenticated}
+        connectionError={!!connectionError}
         displayName={displayName}
         pollState={pollState}
         lastfmStatus={lastfmStatus}
@@ -218,11 +268,17 @@ export function App() {
 
       {!authenticated ? (
         <div id="unauthenticated">
-          <p>Connect your Spotify account to start caching your listening history.</p>
-          <a href="/auth/login">Connect Spotify</a>
+          {connectionError ? (
+            <p>Unable to connect to the server. Please try again later.</p>
+          ) : (
+            <>
+              <p>Connect your Spotify account to start caching your listening history.</p>
+              <a href="/auth/login">Connect Spotify</a>
+            </>
+          )}
         </div>
       ) : (
-        <>
+        <div class={connectionError ? 'app-disabled' : ''}>
           <NowPlaying
             data={nowPlaying}
             lastfmConnected={lastfmConnected}
@@ -272,7 +328,7 @@ export function App() {
             onClose={() => setPreviewOpen(false)}
             onScrobbled={handleScrobbled}
           />
-        </>
+        </div>
       )}
     </>
   );
