@@ -7,15 +7,10 @@ import { historyRouter } from './routes/history';
 import { pollRouter } from './routes/poll';
 import { explorerRouter } from './routes/explorer';
 import { lastfmRouter } from './routes/lastfm';
+import { nowPlayingRouter } from './routes/nowPlaying';
 import { errorHandler } from './middleware/errorHandler';
 import { requireAuth } from './middleware/auth';
-import * as tokenRepo from '../shared/repositories/tokenRepo';
-import * as lastfmRepo from '../shared/repositories/lastfmRepo';
-import * as lastfmClient from '../shared/lastfm/client';
-import { fetchCurrentlyPlaying } from '../shared/spotify/client';
-import { cleanName } from '../shared/lastfm/clean';
-import { buildNowPlayingPayload } from '../shared/lastfm/scrobble';
-import { checkConnection, isDbConnectionError, dbErrorMessage } from '../shared/db';
+import { checkConnection, dbErrorMessage } from '../shared/db';
 
 const app = express();
 
@@ -35,63 +30,8 @@ app.get('/health', async (_req, res) => {
 // Auth routes (no auth required — handles login/callback/status/logout)
 app.use('/auth', authRouter);
 
-// Now playing
-app.get('/now-playing', requireAuth, async (req, res) => {
-  try {
-    const { spotifyUserId } = req.user!;
-    const [token, session] = await Promise.all([
-      tokenRepo.getBySpotifyUserId(spotifyUserId),
-      lastfmRepo.getSession(spotifyUserId),
-    ]);
-    if (!token) { res.json({ isPlaying: false, track: null }); return; }
-    const data = await fetchCurrentlyPlaying(token);
-    if (!data?.is_playing || !data.item) { res.json({ isPlaying: false, track: null }); return; }
-    const t = data.item;
-    res.json({
-      isPlaying: true,
-      sanitizeNowPlaying: session?.sanitizeNowPlaying ?? true,
-      track: {
-        name: t.name,
-        artistName: t.artists.map(a => a.name).join(', '),
-        albumName: t.album.name,
-        cleanedName: cleanName(t.name),
-        cleanedAlbumName: cleanName(t.album.name),
-        durationMs: t.duration_ms,
-        imageUrl: t.album.images[0]?.url ?? null,
-        externalUrl: t.external_urls.spotify,
-      },
-    });
-  } catch (err) {
-    if (isDbConnectionError(err)) { res.status(503).json({ error: 'Database unavailable' }); return; }
-    console.error('[server] now-playing error:', err instanceof Error ? err.message : err);
-    res.json({ isPlaying: false, track: null, error: err instanceof Error ? err.message : 'Unknown error' });
-  }
-});
-
-// Push current Spotify track to Last.fm now-playing
-app.post('/now-playing/push', requireAuth, async (req, res) => {
-  try {
-    const { spotifyUserId } = req.user!;
-    const [token, session] = await Promise.all([
-      tokenRepo.getBySpotifyUserId(spotifyUserId),
-      lastfmRepo.getSession(spotifyUserId),
-    ]);
-    if (!token || !session?.nowPlayingEnabled) { res.json({ ok: false }); return; }
-    const data = await fetchCurrentlyPlaying(token);
-    if (!data?.is_playing || !data.item) { res.json({ ok: false }); return; }
-    await lastfmClient.updateNowPlaying(
-      buildNowPlayingPayload(data.item, session.sanitizeNowPlaying),
-      session.sessionKey,
-    );
-    res.json({ ok: true });
-  } catch (err) {
-    if (isDbConnectionError(err)) { res.status(503).json({ error: 'Database unavailable' }); return; }
-    console.error('[server] now-playing/push error:', err instanceof Error ? err.message : err);
-    res.json({ ok: false });
-  }
-});
-
 // Protected routes
+app.use('/now-playing', requireAuth, nowPlayingRouter);
 app.use('/history', requireAuth, historyRouter);
 app.use('/poll', requireAuth, pollRouter);
 app.use('/explorer', requireAuth, explorerRouter);
