@@ -5,6 +5,7 @@ import * as api from '../api';
 interface ScrobblePreviewModalProps {
   ids: string[];
   open: boolean;
+  rescrobbleCount: number;
   onClose: () => void;
   onScrobbled: (ids: string[]) => void;
 }
@@ -21,7 +22,7 @@ interface EditableRow {
   originalAlbum: string;
 }
 
-export function ScrobblePreviewModal({ ids, open, onClose, onScrobbled }: ScrobblePreviewModalProps) {
+export function ScrobblePreviewModal({ ids, open, rescrobbleCount, onClose, onScrobbled }: ScrobblePreviewModalProps) {
   const [rows, setRows] = useState<EditableRow[]>([]);
   const [allSameAlbum, setAllSameAlbum] = useState(false);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -96,6 +97,14 @@ export function ScrobblePreviewModal({ ids, open, onClose, onScrobbled }: Scrobb
     <div id="preview-modal" class="open" ref={backdropRef} onClick={onBackdropClick}>
       <div id="preview-box">
         <h2>Preview scrobble — {ids.length} track{ids.length === 1 ? '' : 's'}</h2>
+        {rescrobbleCount > 0 && (
+          <p class="rescrobble-note">
+            {rescrobbleCount === ids.length
+              ? (ids.length === 1 ? 'This track has' : 'All of these tracks have')
+              : `${rescrobbleCount} of these tracks have`
+            } already been scrobbled. Delete the original {rescrobbleCount === 1 ? 'scrobble' : 'scrobbles'} on Last.fm first to avoid duplicates.
+          </p>
+        )}
         <div id="preview-scroll">
           <table id="preview-table">
             <thead>

@@ -32,7 +32,7 @@ export function HistoryTab({
 }: HistoryTabProps) {
   const lastClickedIdx = useRef(-1);
 
-  const selectableItems = items.filter((item) => !item.scrobbledAt && !scrobbledIds.has(item.id));
+  const selectableItems = items;
 
   const setSelection = useCallback((next: Set<string>) => {
     onSelectionChange(new Set(next));
@@ -61,7 +61,7 @@ export function HistoryTab({
     const id = tr.dataset.id;
     if (!id) return;
     const item = items.find((i) => i.id === id);
-    if (!item || item.scrobbledAt || scrobbledIds.has(item.id)) return;
+    if (!item) return;
 
     const idx = selectableItems.findIndex((i) => i.id === id);
 
@@ -139,35 +139,36 @@ export function HistoryTab({
               {items.map((item) => {
                 const isScrobbled = !!item.scrobbledAt || scrobbledIds.has(item.id);
                 const isSelected = selectedIds.has(item.id);
-                let cls = '';
-                if (isScrobbled) cls = 'scrobbled';
-                else if (isSelected) cls = 'selected';
+                const cls = [
+                  isScrobbled ? 'scrobbled' : '',
+                  isSelected ? 'selected' : '',
+                ].filter(Boolean).join(' ');
 
                 return (
                   <tr key={item.id} data-id={item.id} data-album={item.track.albumName} class={cls}>
                     {lastfmEnabled ? (
-                      isScrobbled ? (
-                        <td class="check-cell" title={
+                      <td class="check-cell">
+                        <input type="checkbox" class="row-check" checked={isSelected} />
+                      </td>
+                    ) : (
+                      <td class="check-cell"></td>
+                    )}
+                    <td>
+                      {isScrobbled ? (
+                        <span class="scrobble-badge" title={
                           (item.scrobbleSanitized ?? scrobbledIds.has(item.id))
                             ? 'Scrobbled (sanitized)'
                             : item.scrobbleSanitized === false
                               ? 'Scrobbled (original tags)'
                               : 'Scrobbled'
                         }>
-                          {'\u2713'}
-                          {(item.scrobbleSanitized ?? (scrobbledIds.has(item.id) || null)) === true && (
-                            <span style={{ fontSize: '0.6rem', marginLeft: '0.15rem', opacity: 0.7 }}>S</span>
-                          )}
-                        </td>
+                          {(item.scrobbleSanitized ?? (scrobbledIds.has(item.id) || null)) === true ? '✓S' : '✓'}
+                        </span>
                       ) : (
-                        <td class="check-cell">
-                          <input type="checkbox" class="row-check" checked={isSelected} />
-                        </td>
-                      )
-                    ) : (
-                      <td class="check-cell"></td>
-                    )}
-                    <td>{new Date(item.playedAt).toLocaleString()}</td>
+                        <span class="scrobble-badge-spacer" />
+                      )}
+                      {new Date(item.playedAt).toLocaleString()}
+                    </td>
                     <td class="track-name">{item.track.name}</td>
                     <td>{item.track.artistName}</td>
                     <td>{item.track.albumName}</td>

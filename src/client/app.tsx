@@ -265,6 +265,10 @@ export function App() {
           <ScrobblePreviewModal
             ids={previewIds}
             open={previewOpen}
+            rescrobbleCount={previewIds.filter((id) => {
+              const item = historyItems.find((i) => i.id === id);
+              return item && (!!item.scrobbledAt || scrobbledIds.has(id));
+            }).length}
             onClose={() => setPreviewOpen(false)}
             onScrobbled={handleScrobbled}
           />

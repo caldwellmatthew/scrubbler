@@ -97,7 +97,7 @@ td {
 }
 td.track-name { color: #fff; }
 tr:hover td { background: #181818; }
-tbody tr:not(.scrobbled) { cursor: pointer; }
+tbody tr { cursor: pointer; }
 tr.selected td { background: #182818; }
 tr.selected:hover td { background: #1e3020; }
 #load-more {
@@ -123,8 +123,24 @@ th.check-col, td.check-cell {
   padding-right: 0.5rem;
 }
 td.check-cell { color: #1db954; font-size: 0.9rem; }
-tr.scrobbled td { opacity: 0.45; }
+tr.scrobbled td { opacity: 0.6; }
 tr.scrobbled td.check-cell { opacity: 1; }
+tr.scrobbled.selected td { opacity: 0.85; background: #182818; }
+tr.scrobbled.selected:hover td { background: #1e3020; }
+.scrobble-badge {
+  display: inline-block;
+  width: 1.2rem;
+  margin-right: 0.3rem;
+  font-size: 0.65rem;
+  color: #1db954;
+  opacity: 0.8;
+  text-align: center;
+}
+.scrobble-badge-spacer {
+  display: inline-block;
+  width: 1.2rem;
+  margin-right: 0.3rem;
+}
 
 /* -- Scrobble action bar -- */
 #scrobble-bar {
@@ -233,6 +249,11 @@ tr.scrobbled td.check-cell { opacity: 1; }
 #preview-table input:focus { outline:none; border-color:#555; }
 tr.preview-changed td { background:#1e1a10; }
 tr.preview-changed input { border-color:#7a6020; }
+.rescrobble-note {
+  font-size: 0.8rem;
+  color: #997a00;
+  margin: -0.25rem 0 0;
+}
 #preview-actions { display:flex; gap:0.75rem; justify-content:flex-end; }
 #preview-confirm-btn { border-color:#d51007; color:#e0323f; }
 #preview-confirm-btn:hover { background:#d5100715; }
