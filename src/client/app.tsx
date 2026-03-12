@@ -109,6 +109,11 @@ export function App() {
 
   useEffect(() => {
     async function init() {
+      const ott = new URLSearchParams(window.location.search).get('ott');
+      if (ott) {
+        await fetch(`/auth/finalize?ott=${ott}`);
+        window.history.replaceState({}, '', '/');
+      }
       const status = await api.getAuthStatus();
       setAuthenticated(status.authenticated);
       setDisplayName(status.displayName || status.spotifyUserId || '');

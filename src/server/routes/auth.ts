@@ -17,6 +17,10 @@ interface StateEntry {
 const pendingStates = new Map<string, StateEntry>();
 const STATE_TTL_MS = 10 * 60 * 1000;
 
+// One-time tokens for cross-origin dev auth handoff
+const pendingOTTs = new Map<string, { spotifyUserId: string; expiry: number }>();
+const OTT_TTL_MS = 60 * 1000;
+
 function generateState(redirectUri: string): string {
   const state = crypto.randomBytes(16).toString('hex');
   pendingStates.set(state, { expiry: Date.now() + STATE_TTL_MS, redirectUri });
@@ -133,11 +137,32 @@ authRouter.get('/callback', async (req, res, next) => {
 
     console.log(`[auth] Successfully authenticated Spotify user: ${profile.id}`);
 
-    // Set signed cookie so future requests are user-scoped
-    res.cookie('uid', profile.id, COOKIE_OPTIONS);
-
-    res.redirect(config.clientOrigin + '/');
+    if (config.clientOrigin) {
+      // Dev: hand off via one-time token so the cookie is set through the Vite proxy
+      // (avoids cookie domain mismatch between 127.0.0.1:3000 and localhost:5173)
+      const ott = crypto.randomBytes(16).toString('hex');
+      pendingOTTs.set(ott, { spotifyUserId: profile.id, expiry: Date.now() + OTT_TTL_MS });
+      res.redirect(`${config.clientOrigin}/?ott=${ott}`);
+    } else {
+      // Production: same origin, set cookie directly
+      res.cookie('uid', profile.id, COOKIE_OPTIONS);
+      res.redirect('/');
+    }
   } catch (err) {
     next(err);
   }
+});
+
+authRouter.get('/finalize', (req, res) => {
+  const ott = req.query.ott as string | undefined;
+  if (!ott) { res.status(400).json({ error: 'Missing token' }); return; }
+  const entry = pendingOTTs.get(ott);
+  if (!entry || Date.now() > entry.expiry) {
+    pendingOTTs.delete(ott);
+    res.status(400).json({ error: 'Invalid or expired token' });
+    return;
+  }
+  pendingOTTs.delete(ott);
+  res.cookie('uid', entry.spotifyUserId, COOKIE_OPTIONS);
+  res.json({ ok: true });
 });

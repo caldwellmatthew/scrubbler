@@ -10,14 +10,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    proxy: {
-      '/auth': 'http://127.0.0.1:3000',
-      '/health': 'http://127.0.0.1:3000',
-      '/history': 'http://127.0.0.1:3000',
-      '/now-playing': 'http://127.0.0.1:3000',
-      '/poll': 'http://127.0.0.1:3000',
-      '/lastfm': 'http://127.0.0.1:3000',
-      '/explorer': 'http://127.0.0.1:3000',
-    },
+    proxy: Object.fromEntries(
+      ['/auth', '/health', '/history', '/now-playing', '/poll', '/lastfm', '/explorer'].map(
+        (path) => [path, { target: 'http://127.0.0.1:3000', changeOrigin: true }],
+      ),
+    ),
   },
 });
