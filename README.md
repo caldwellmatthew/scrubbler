@@ -4,7 +4,7 @@ A personal Spotify listening history tracker that scrobbles to Last.fm — with 
 
 ## What it does
 
-- Polls Spotify every minute and stores your listening history to a local PostgreSQL database
+- Polls Spotify and stores your listening history to a local PostgreSQL database
 - Shows a live now-playing bar with the current track
 - Scrobbles plays to Last.fm automatically (auto-scrobble) or manually via the history browser
 - Sanitizes track and album names before scrobbling — strips noise like *(2021 Remaster)*, *[Deluxe Edition]*, *- Live*, etc.
@@ -12,14 +12,14 @@ A personal Spotify listening history tracker that scrobbles to Last.fm — with 
 
 ## Stack
 
-TypeScript · Node.js · Express · PostgreSQL · Docker
+TypeScript · Node.js · Express · Preact · Vite · PostgreSQL · Docker
 
 ## Setup
 
 ### 1. Spotify
 
 1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and create an app
-2. Add `http://localhost:3000/auth/callback` to the app's Redirect URIs
+2. Add `http://127.0.0.1:3000/auth/callback` to the app's Redirect URIs (must be `127.0.0.1`, not `localhost` — Spotify rejects `localhost`)
 3. Note your Client ID and Client Secret
 
 ### 2. Last.fm (optional)
@@ -37,19 +37,21 @@ docker compose up -d
 cp .env.example .env
 # Fill in SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, OAUTH_STATE_SECRET
 # Optionally add LASTFM_API_KEY, LASTFM_API_SECRET
+# In development, also set CLIENT_ORIGIN=http://localhost:5173
 
 # Install dependencies
 npm install
 
-# Start server and worker (separate terminals)
-npm run dev:server
-npm run dev:worker
+# Apply database migrations
+npm run migrate
 
-# Authenticate
-open http://localhost:3000/auth/login
+# Start server, worker, and client (three separate terminals)
+npm run dev:server   # Express API on :3000
+npm run dev:worker   # polling loop
+npm run dev:client   # Vite dev server on :5173
 ```
 
-Then connect Last.fm from the web UI if desired.
+Then navigate to the web UI at http://localhost:5173/ to authenticate.
 
 ## Environment Variables
 
@@ -63,6 +65,8 @@ Then connect Last.fm from the web UI if desired.
 | `LASTFM_API_SECRET` | No | Required alongside API key |
 | `PORT` | No | HTTP server port (default: `3000`) |
 | `POLL_INTERVAL_MS` | No | Polling interval in ms (default: `60000`) |
+| `CLIENT_ORIGIN` | No | Origin of the client app for post-auth redirects. Set to `http://localhost:5173` in development; leave empty in production. |
+| `NODE_ENV` | No | `development` or `production` |
 
 ## Tag Sanitization
 
