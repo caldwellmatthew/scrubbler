@@ -198,9 +198,19 @@ lastfmRouter.post('/scrobble', async (req, res, next) => {
     }
     const rows = await historyRepo.getByIds(ids, spotifyUserId);
     const items = buildScrobbleItems(rows, { overrides });
-    await lastfmClient.scrobble(items, session.sessionKey);
-    await markScrobbledWithSanitizeInfo(rows, items);
-    res.json({ ok: true, scrobbled: items.length });
+    const results = await lastfmClient.scrobble(items, session.sessionKey);
+    await markScrobbledWithSanitizeInfo(rows, items, results);
+    const ignored = results.flatMap((result, i) =>
+      result.accepted
+        ? []
+        : [{
+            id: String(rows[i].id),
+            artist: items[i].artist,
+            track: items[i].track,
+            reason: result.ignoredReason,
+          }],
+    );
+    res.json({ ok: true, scrobbled: items.length - ignored.length, ignored });
   } catch (err) {
     next(err);
   }

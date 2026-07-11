@@ -1,5 +1,5 @@
 import type { ListenHistoryRow } from '../types';
-import type { ScrobbleItem } from './client';
+import type { ScrobbleItem, ScrobbleResult } from './client';
 import { cleanName } from './clean';
 import * as historyRepo from '../repositories/historyRepo';
 
@@ -25,16 +25,19 @@ export function buildScrobbleItems(
 }
 
 /**
- * Mark rows as scrobbled, partitioning by whether the scrobbled values
- * differ from the originals (i.e. were sanitized).
+ * Mark rows accepted by Last.fm as scrobbled, partitioning by whether the
+ * scrobbled values differ from the originals (i.e. were sanitized). Rows
+ * whose scrobbles were ignored are left unscrobbled.
  */
 export async function markScrobbledWithSanitizeInfo(
   rows: ListenHistoryRow[],
   items: ScrobbleItem[],
+  results: ScrobbleResult[],
 ): Promise<void> {
   const sanitizedIds: string[] = [];
   const unsanitizedIds: string[] = [];
   for (let i = 0; i < rows.length; i++) {
+    if (!results[i]?.accepted) continue;
     const row = rows[i];
     const item = items[i];
     if (item.track !== row.name || item.album !== row.albumName) {

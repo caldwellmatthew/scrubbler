@@ -95,9 +95,18 @@ async function pollUser(token: OAuthToken): Promise<void> {
       if (rows.length > 0) {
         rows.sort((a, b) => a.playedAt.getTime() - b.playedAt.getTime());
         const scrobbleItems = buildScrobbleItems(rows, { sanitize: session.sanitizeScrobble });
-        await lastfmClient.scrobble(scrobbleItems, session.sessionKey);
-        await markScrobbledWithSanitizeInfo(rows, scrobbleItems);
-        console.log(`[worker] ${tag} Auto-scrobbled ${scrobbleItems.length} tracks to Last.fm`);
+        const results = await lastfmClient.scrobble(scrobbleItems, session.sessionKey);
+        await markScrobbledWithSanitizeInfo(rows, scrobbleItems, results);
+        const accepted = results.filter((r) => r.accepted).length;
+        console.log(`[worker] ${tag} Auto-scrobbled ${accepted}/${scrobbleItems.length} tracks to Last.fm`);
+        results.forEach((result, i) => {
+          if (!result.accepted) {
+            const item = scrobbleItems[i];
+            console.warn(
+              `[worker] ${tag} Last.fm ignored scrobble of "${item.track}" by ${item.artist}: ${result.ignoredReason}`,
+            );
+          }
+        });
       }
     } catch (err) {
       console.error(`[worker] ${tag} Auto-scrobble failed:`, err);

@@ -81,7 +81,13 @@ export function ScrobblePreviewModal({ ids, open, rescrobbleCount, onClose, onSc
         alert('Scrobble failed: ' + (result.error || 'Unknown error'));
         return;
       }
-      onScrobbled(ids);
+      const ignored = result.ignored ?? [];
+      if (ignored.length > 0) {
+        const lines = ignored.map((s) => `"${s.track}" by ${s.artist} — ${s.reason || 'no reason given'}`);
+        alert(`Last.fm ignored ${ignored.length} of ${ids.length} scrobbles:\n\n${lines.join('\n')}`);
+      }
+      const ignoredIds = new Set(ignored.map((s) => s.id));
+      onScrobbled(ids.filter((id) => !ignoredIds.has(id)));
     } catch (err: unknown) {
       alert('Scrobble failed: ' + (err instanceof Error ? err.message : String(err)));
     }
