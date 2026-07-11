@@ -3,9 +3,10 @@
 ALTER TABLE tracks ADD COLUMN IF NOT EXISTS artist_names TEXT[];
 
 -- Backfill from the legacy comma-joined string, then drop it. Artist names
--- that themselves contain ", " are mis-split by this; run the backfill
--- script (npm run backfill:artists) afterwards to correct multi-artist rows
--- from the Spotify API.
+-- that themselves contain ", " are mis-split by this; on a database with
+-- pre-existing rows, multi-element arrays should be re-verified against the
+-- Spotify API (see the backfill script in this migration's introducing
+-- commit, retired after it ran).
 DO $$
 BEGIN
   IF EXISTS (
