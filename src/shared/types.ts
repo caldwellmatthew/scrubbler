@@ -14,7 +14,7 @@ export interface OAuthToken {
 export interface Track {
   spotifyTrackId: string;
   name: string;
-  artistName: string;
+  artistNames: string[]; // ordered, primary artist first
   albumName: string;
   durationMs: number;
   externalUrl: string | null;
@@ -32,7 +32,7 @@ export interface ListenEvent {
 export interface ListenHistoryRow extends ListenEvent {
   id: string;
   name: string;
-  artistName: string;
+  artistNames: string[]; // ordered, primary artist first
   albumName: string;
   durationMs: number;
   externalUrl: string | null;

@@ -11,13 +11,12 @@ import type { SpotifyPlayHistoryItem } from '../shared/types';
 
 function itemToTrack(item: SpotifyPlayHistoryItem): Track {
   const { track } = item;
-  const artist = track.artists.map((a) => a.name).join(', ');
   const image = track.album.images[0]?.url ?? null;
 
   return {
     spotifyTrackId: track.id,
     name: track.name,
-    artistName: artist,
+    artistNames: track.artists.map((a) => a.name),
     albumName: track.album.name,
     durationMs: track.duration_ms,
     externalUrl: track.external_urls.spotify ?? null,

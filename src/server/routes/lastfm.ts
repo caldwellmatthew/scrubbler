@@ -164,7 +164,7 @@ lastfmRouter.post('/preview', async (req, res, next) => {
     const items = rows.map((row) => ({
       id: row.id,
       playedAt: row.playedAt,
-      artist: row.artistName.split(', ')[0],
+      artist: row.artistNames[0],
       track: cleanName(row.name),
       album: cleanName(row.albumName),
       originalTrack: row.name,

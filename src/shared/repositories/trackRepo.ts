@@ -24,7 +24,7 @@ export async function upsertMany(tracks: Track[], client?: PoolClient): Promise<
     values.push(
       track.spotifyTrackId,
       track.name,
-      track.artistName,
+      track.artistNames,
       track.albumName,
       track.durationMs,
       track.externalUrl,
@@ -35,11 +35,11 @@ export async function upsertMany(tracks: Track[], client?: PoolClient): Promise<
   });
 
   await pool.query(
-    `INSERT INTO tracks (spotify_track_id, name, artist_name, album_name, duration_ms, external_url, preview_url, image_url, updated_at)
+    `INSERT INTO tracks (spotify_track_id, name, artist_names, album_name, duration_ms, external_url, preview_url, image_url, updated_at)
      VALUES ${placeholders.join(', ')}
      ON CONFLICT (spotify_track_id) DO UPDATE SET
        name         = EXCLUDED.name,
-       artist_name  = EXCLUDED.artist_name,
+       artist_names = EXCLUDED.artist_names,
        album_name   = EXCLUDED.album_name,
        duration_ms  = EXCLUDED.duration_ms,
        external_url = EXCLUDED.external_url,

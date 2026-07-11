@@ -108,7 +108,7 @@ export async function queryHistory(params: HistoryQueryParams, spotifyUserId: st
        lh.scrobbled_at,
        lh.scrobble_sanitized,
        t.name,
-       t.artist_name,
+       t.artist_names,
        t.album_name,
        t.duration_ms,
        t.external_url,
@@ -134,7 +134,7 @@ function mapRow(row: Record<string, unknown>): ListenHistoryRow {
     scrobbledAt: row.scrobbled_at as Date | null,
     scrobbleSanitized: row.scrobble_sanitized as boolean | null,
     name: row.name as string,
-    artistName: row.artist_name as string,
+    artistNames: row.artist_names as string[],
     albumName: row.album_name as string,
     durationMs: row.duration_ms as number,
     externalUrl: row.external_url as string | null,
@@ -155,7 +155,7 @@ export async function getByIds(ids: string[], spotifyUserId: string): Promise<Li
        lh.scrobbled_at,
        lh.scrobble_sanitized,
        t.name,
-       t.artist_name,
+       t.artist_names,
        t.album_name,
        t.duration_ms,
        t.external_url,
@@ -174,7 +174,7 @@ export async function getUnscrobbledByPlayedAts(spotifyUserId: string, playedAts
   const pool = getPool();
   const result = await pool.query(
     `SELECT lh.id, lh.spotify_track_id, lh.spotify_user_id, lh.played_at, lh.scrobbled_at, lh.scrobble_sanitized,
-            t.name, t.artist_name, t.album_name, t.duration_ms,
+            t.name, t.artist_names, t.album_name, t.duration_ms,
             t.external_url, t.preview_url, t.image_url
      FROM listen_history lh
      JOIN tracks t ON t.spotify_track_id = lh.spotify_track_id

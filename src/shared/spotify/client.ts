@@ -2,7 +2,7 @@ import axios from 'axios';
 import { refreshAccessToken } from './auth';
 import * as tokenRepo from '../repositories/tokenRepo';
 import type { OAuthToken } from '../types';
-import type { SpotifyCurrentlyPlayingResponse, SpotifyRecentlyPlayedResponse, SpotifyUserProfile } from '../types';
+import type { SpotifyCurrentlyPlayingResponse, SpotifyRecentlyPlayedResponse, SpotifyTrack, SpotifyUserProfile } from '../types';
 
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
 const REFRESH_BUFFER_MS = 60 * 1000; // refresh if within 60 seconds of expiry
@@ -90,6 +90,26 @@ export async function fetchCurrentlyPlaying(
   }
   if (response.status === 204 || !response.data) return null;
   return response.data as SpotifyCurrentlyPlayingResponse;
+}
+
+// Spotify caps the number of ids per /tracks request
+export const FETCH_TRACKS_MAX_IDS = 50;
+
+/**
+ * Fetch track metadata by ID. Results are in request order; unknown or
+ * removed tracks come back as null.
+ */
+export async function fetchTracks(token: OAuthToken, ids: string[]): Promise<(SpotifyTrack | null)[]> {
+  if (ids.length > FETCH_TRACKS_MAX_IDS) {
+    throw new Error(`fetchTracks accepts at most ${FETCH_TRACKS_MAX_IDS} ids per call (got ${ids.length})`);
+  }
+  const accessToken = await getValidToken(token);
+  const response = await axios.get<{ tracks: (SpotifyTrack | null)[] }>(`${SPOTIFY_API_BASE}/tracks`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: { ids: ids.join(',') },
+    timeout: REQUEST_TIMEOUT_MS,
+  });
+  return response.data.tracks;
 }
 
 export async function fetchUserProfile(accessToken: string): Promise<SpotifyUserProfile> {
