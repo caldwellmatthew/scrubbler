@@ -5,6 +5,10 @@ import { buildSig } from './utils';
 const LASTFM_API_URL = 'https://ws.audioscrobbler.com/2.0/';
 const REQUEST_TIMEOUT_MS = 10_000;
 
+// Last.fm silently ignores scrobbles whose submitted duration is below its
+// minimum track length. duration is optional, so we omit it below the cutoff.
+const LASTFM_MIN_DURATION_SECONDS = 30;
+
 export interface ScrobbleItem {
   artist: string;
   track: string;
@@ -64,7 +68,9 @@ export async function scrobble(items: ScrobbleItem[], sessionKey: string): Promi
     params[`track[${i}]`] = item.track;
     params[`album[${i}]`] = item.album;
     params[`timestamp[${i}]`] = String(item.timestamp);
-    params[`duration[${i}]`] = String(item.duration);
+    if (item.duration >= LASTFM_MIN_DURATION_SECONDS) {
+      params[`duration[${i}]`] = String(item.duration);
+    }
   });
 
   const api_sig = buildSig(params, config.lastfmApiSecret);
