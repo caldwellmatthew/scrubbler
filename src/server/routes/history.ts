@@ -51,7 +51,7 @@ historyRouter.get('/', async (req, res, next) => {
         track: {
           spotifyTrackId: row.spotifyTrackId,
           name: row.name,
-          artistName: row.artistName,
+          artistName: row.artistNames.join(', '),
           albumName: row.albumName,
           durationMs: row.durationMs,
           externalUrl: row.externalUrl,

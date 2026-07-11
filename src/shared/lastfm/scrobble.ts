@@ -16,7 +16,7 @@ export function buildScrobbleItems(
 ): ScrobbleItem[] {
   const { sanitize = true, overrides } = options;
   return rows.map((row) => ({
-    artist: row.artistName.split(', ')[0],
+    artist: row.artistNames[0],
     track: overrides?.[String(row.id)]?.track ?? (sanitize ? cleanName(row.name) : row.name),
     album: overrides?.[String(row.id)]?.album ?? (sanitize ? cleanName(row.albumName) : row.albumName),
     timestamp: Math.floor(row.playedAt.getTime() / 1000),

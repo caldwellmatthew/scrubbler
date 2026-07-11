@@ -9,7 +9,7 @@ function makeRow(overrides: Partial<ListenHistoryRow> = {}): ListenHistoryRow {
     spotifyUserId: 'user-1',
     playedAt: new Date('2026-01-01T12:00:00.000Z'),
     name: 'Song (Remastered)',
-    artistName: 'The Band',
+    artistNames: ['The Band'],
     albumName: 'The Album (Deluxe Edition)',
     durationMs: 180_000,
     externalUrl: null,
@@ -34,9 +34,11 @@ describe('buildScrobbleItems', () => {
     expect(item.album).toBe('The Album (Deluxe Edition)');
   });
 
-  it('uses the first comma-separated artist', () => {
-    const [item] = buildScrobbleItems([makeRow({ artistName: 'A, B, C' })]);
-    expect(item.artist).toBe('A');
+  it('uses the primary artist, even when its name contains a comma', () => {
+    const [item] = buildScrobbleItems([
+      makeRow({ artistNames: ['Tyler, The Creator', 'Kali Uchis'] }),
+    ]);
+    expect(item.artist).toBe('Tyler, The Creator');
   });
 
   it('converts playedAt to a unix-seconds timestamp', () => {

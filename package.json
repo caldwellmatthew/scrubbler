@@ -13,6 +13,7 @@
     "start:server": "NODE_ENV=production node dist/server/index.js",
     "start:worker": "node dist/worker/index.js",
     "migrate": "cat migrations/*.sql | psql $DATABASE_URL",
+    "backfill:artists": "tsc && node dist/scripts/backfillArtists.js",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.client.json",
     "test": "vitest run",
     "test:watch": "vitest"
