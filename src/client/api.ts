@@ -108,7 +108,14 @@ export async function getScrobblePreview(ids: string[]): Promise<{ items: Previe
   return post('/lastfm/preview', { ids });
 }
 
-export async function submitScrobble(ids: string[], overrides: Record<string, { track: string; album: string }>): Promise<{ ok: boolean; error?: string }> {
+export interface IgnoredScrobble {
+  id: string;
+  artist: string;
+  track: string;
+  reason: string | null;
+}
+
+export async function submitScrobble(ids: string[], overrides: Record<string, { track: string; album: string }>): Promise<{ ok: boolean; scrobbled?: number; ignored?: IgnoredScrobble[]; error?: string }> {
   return post('/lastfm/scrobble', { ids, overrides });
 }
 
