@@ -12,7 +12,7 @@
     "build:client": "vite build",
     "start:server": "NODE_ENV=production node dist/server/index.js",
     "start:worker": "node dist/worker/index.js",
-    "migrate": "cat migrations/*.sql | psql $DATABASE_URL",
+    "migrate": "ts-node --transpile-only src/scripts/migrate.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.client.json",
     "test": "vitest run",
     "test:watch": "vitest"

@@ -98,7 +98,7 @@ npm run build:client  # Build client only
 npm run start:server  # Run compiled server (NODE_ENV=production, serves client)
 npm run start:worker  # Run compiled worker
 npm run typecheck     # Type-check both server and client
-npm run migrate       # Apply migrations manually
+npm run migrate       # Apply pending migrations
 ```
 
 ## Client Architecture
@@ -122,6 +122,19 @@ In development, the Vite dev server (port 5173) proxies all API routes to the Ex
 - **`listen_history`** — one row per play event; `UNIQUE(spotify_track_id, played_at)` deduplicates; `scrobbled_at` tracks Last.fm scrobble time
 - **`poll_state`** — single-row cursor table; `last_played_at_ms` is the `after` param for the next poll
 - **`lastfm_sessions`** — Last.fm session key and per-user toggles (`auto_scrobble_enabled`, `now_playing_enabled`, `sanitize_now_playing`)
+- **`schema_migrations`** — one row per applied migration file, with the file's checksum; maintained by `npm run migrate`
+
+## Migrations
+
+Plain `.sql` files in `migrations/`, applied in filename order by `npm run migrate`. Each file runs inside its own transaction and is recorded in `schema_migrations`, so it applies exactly once.
+
+Migrations are **forward-only** — there are no down scripts. Undo a bad migration with a new migration, or by restoring the database.
+
+The checksum of each applied file is re-verified on every run. Editing a migration that has already run is an error, since the recorded schema would no longer match the repository; add a new migration instead.
+
+`npm run migrate -- --baseline` adopts a database whose schema already matches the migration set, recording every file as applied without running any. It is only valid when nothing has been recorded yet.
+
+Both the server and worker containers run the migrator before starting; a Postgres advisory lock serializes concurrent runs so whichever starts second waits.
 
 ## Spotify App Setup
 
