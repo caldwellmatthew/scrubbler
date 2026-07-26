@@ -9,7 +9,6 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U spotifyuser -d scrubbler']
       interval: 5s
@@ -19,7 +18,7 @@ services:
   server:
     profiles: [production]
     build: .
-    command: node dist/server/index.js
+    command: sh -c "node dist/scripts/migrate.js && node dist/server/index.js"
     ports:
       - '3000:3000'
     environment:
@@ -34,7 +33,7 @@ services:
   worker:
     profiles: [production]
     build: .
-    command: node dist/worker/index.js
+    command: sh -c "node dist/scripts/migrate.js && node dist/worker/index.js"
     environment:
       NODE_ENV: production
       DATABASE_URL: postgres://spotifyuser:spotifypass@postgres:5432/scrubbler
