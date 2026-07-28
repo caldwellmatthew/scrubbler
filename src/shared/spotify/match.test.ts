@@ -89,6 +89,26 @@ describe('normalizeForMatch', () => {
   it('maps empty input to empty output', () => {
     expect(normalizeForMatch('')).toBe('');
   });
+
+  // An ASCII-only strip erased these entirely, which both hid them from
+  // matching and made any two of them compare as identical.
+  it('preserves non-Latin scripts', () => {
+    expect(normalizeForMatch('細野晴臣', { clean: false })).toBe('細野晴臣');
+    expect(normalizeForMatch('矢野顕子', { clean: false })).toBe('矢野顕子');
+    expect(normalizeForMatch('Кино', { clean: false })).toBe('кино');
+    expect(normalizeForMatch('한대수', { clean: false })).toBe('한대수');
+  });
+
+  it('still strips punctuation around non-Latin text', () => {
+    expect(normalizeForMatch('コズミック・サーフィン', { clean: false })).toBe('コズミックサーフィン');
+    expect(normalizeForMatch('君に、胸キュン。', { clean: false })).toBe('君に胸キュン');
+  });
+
+  it('distinguishes different non-Latin strings', () => {
+    expect(normalizeForMatch('細野晴臣', { clean: false })).not.toBe(
+      normalizeForMatch('矢野顕子', { clean: false }),
+    );
+  });
 });
 
 describe('diceCoefficient', () => {
@@ -180,6 +200,29 @@ describe('scoreCandidate', () => {
       makeTrack({ name: 'Xtal (Karaoke Version)' }),
     );
     expect(result.disqualified).toBe(false);
+  });
+
+  it('matches a non-Latin title against itself', () => {
+    const result = scoreCandidate(
+      { artist: '細野晴臣', track: 'Sports Men' },
+      makeTrack({ name: 'Sports Men', artists: [{ id: 'h', name: '細野晴臣' }] }),
+    );
+    expect(result.disqualified).toBe(false);
+    expect(result.score).toBe(1);
+  });
+
+  // Both sides used to normalize to "" and score a perfect, meaningless 1.
+  it('does not match two unrelated non-Latin titles', () => {
+    const result = scoreCandidate(
+      { artist: '細野晴臣', track: 'コズミック・サーフィン' },
+      makeTrack({ name: '君に、胸キュン。', artists: [{ id: 'y', name: '矢野顕子' }] }),
+    );
+    expect(result.disqualified).toBe(true);
+  });
+
+  it('disqualifies a candidate whose title is all punctuation', () => {
+    const result = scoreCandidate(loved, makeTrack({ name: '!!!' }));
+    expect(result.disqualified).toBe(true);
   });
 
   it('penalizes a live version when the loved track is not live', () => {

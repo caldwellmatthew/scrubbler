@@ -57,7 +57,12 @@ const COMBINING = /[\u0300-\u036f]/g;
 // legitimately starts with one ("Ft. Lauderdale") is left alone. Deliberately
 // excludes "with", which would eat "Sleeping with Sirens".
 const FEATURE_CREDIT = /[\s([]+(?:feat|ft|featuring)\b\.?\s.*$/;
-const NON_ALPHANUMERIC = /[^a-z0-9\s]/g;
+// Strips punctuation and symbols while keeping letters, digits, and combining
+// marks from every script. An ASCII-only class would erase CJK titles
+// entirely, which both hides them from matching and makes any two of them
+// compare as identical. Marks are kept because outside Latin they carry
+// meaning — dropping a Japanese dakuten turns ズ into ス.
+const NON_ALPHANUMERIC = /[^\p{L}\p{N}\p{M}\s]/gu;
 const LEADING_ARTICLE = /^the\s+/;
 const KARAOKE = /karaoke|tribute|made popular by|originally performed by|in the style of|cover version/i;
 const LIVE = /\blive\b/i;
@@ -76,8 +81,12 @@ const LIVE = /\blive\b/i;
 export function normalizeForMatch(s: string, opts: { clean?: boolean } = {}): string {
   const cleaned = opts.clean === false ? s : cleanName(s);
   return cleaned
+    // Decompose only to drop Latin diacritics, then recompose: leaving the
+    // string decomposed splits Hangul into jamo and detaches Japanese voicing
+    // marks from their kana.
     .normalize('NFKD')
     .replace(COMBINING, '')
+    .normalize('NFC')
     .toLowerCase()
     .replace(FEATURE_CREDIT, '')
     .replace(/&/g, ' and ')
@@ -142,7 +151,11 @@ export function scoreCandidate(loved: LovedRef, track: SpotifyTrack): CandidateS
   // track should still be able to match one.
   const karaoke = KARAOKE.test(candidateRaw) && !KARAOKE.test(lovedRaw);
 
-  if (karaoke || artistScore < ARTIST_FLOOR || titleScore < TITLE_FLOOR) {
+  // A side that normalizes away entirely carries no signal, and two such sides
+  // would otherwise compare as a perfect match.
+  const noSignal = lovedTitle === '' || candidateTitle === '' || lovedArtist === '';
+
+  if (noSignal || karaoke || artistScore < ARTIST_FLOOR || titleScore < TITLE_FLOOR) {
     return { score: 0, titleScore, artistScore, primaryArtistScore, disqualified: true };
   }
 
