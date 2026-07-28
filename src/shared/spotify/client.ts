@@ -8,7 +8,14 @@ const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
 const REFRESH_BUFFER_MS = 60 * 1000; // refresh if within 60 seconds of expiry
 const REQUEST_TIMEOUT_MS = 10_000;
 
-async function getValidToken(token: OAuthToken): Promise<string> {
+/**
+ * Return a usable access token, refreshing first if it is close to expiry.
+ *
+ * Mutates `token` in place so callers holding the row see the new values. That
+ * makes it unsafe to call concurrently for the same token — callers fanning out
+ * requests should resolve the access token once up front and pass the string.
+ */
+export async function getValidToken(token: OAuthToken): Promise<string> {
   const now = Date.now();
   const expiresAt = token.expiresAt.getTime();
 
@@ -24,6 +31,7 @@ async function getValidToken(token: OAuthToken): Promise<string> {
     refreshed.accessToken,
     refreshed.refreshToken,
     refreshed.expiresAt,
+    refreshed.scope,
   );
 
   // Mutate in-place so callers have the updated token
@@ -73,7 +81,7 @@ export async function fetchCurrentlyPlaying(
     // Token was revoked (e.g. worker refreshed it) — force refresh and retry once
     console.log(`[client] Got 401 for currently-playing — forcing token refresh`);
     const refreshed = await refreshAccessToken(token.refreshToken);
-    await tokenRepo.updateTokens(token.spotifyUserId, refreshed.accessToken, refreshed.refreshToken, refreshed.expiresAt);
+    await tokenRepo.updateTokens(token.spotifyUserId, refreshed.accessToken, refreshed.refreshToken, refreshed.expiresAt, refreshed.scope);
     token.accessToken = refreshed.accessToken;
     token.refreshToken = refreshed.refreshToken;
     token.expiresAt = refreshed.expiresAt;

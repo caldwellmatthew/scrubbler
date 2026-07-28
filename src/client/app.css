@@ -167,8 +167,8 @@ tr.scrobbled.selected:hover td { background: #1e3020; }
   margin-right: 0.3rem;
 }
 
-/* -- Scrobble action bar -- */
-#scrobble-bar {
+/* -- Selection action bar -- */
+.action-bar {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -185,13 +185,72 @@ tr.scrobbled.selected:hover td { background: #1e3020; }
   opacity: 0;
   transition: opacity 0.15s;
 }
-#scrobble-bar.visible {
+.action-bar.visible {
   visibility: visible;
   opacity: 1;
 }
 #scrobble-btn { border-color: #d51007; color: #e0323f; }
 #scrobble-btn:hover { background: #d5100715; }
 #scrobble-clear-btn { border-color: #444; color: #888; }
+
+/* -- Liked Sync tab -- */
+.liked-sync-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.liked-sync-counts { color: #666; font-size: 0.8rem; margin-left: auto; }
+.liked-sync-notice {
+  color: #aaa;
+  font-size: 0.85rem;
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+#liked-sync-confirm-btn { border-color: #1db954; color: #1db954; }
+#liked-sync-confirm-btn:hover:not(:disabled) { background: #1db95415; }
+
+.alt-select {
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #e0e0e0;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  max-width: 100%;
+}
+
+.confidence {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  border: 1px solid;
+}
+.confidence-high   { color: #1db954; border-color: #1db95455; }
+.confidence-medium { color: #997a00; border-color: #997a0055; }
+.confidence-low    { color: #888;    border-color: #444; }
+.confidence-none   { color: #666;    border-color: transparent; }
+
+tr.unmatched td { color: #666; }
+tr.unmatched { cursor: default; }
+.no-match { color: #666; font-style: italic; font-size: 0.85rem; }
+
+.scope-prompt {
+  background: #1e1a10;
+  border: 1px solid #997a0055;
+  border-radius: 4px;
+  padding: 1rem;
+  font-size: 0.9rem;
+}
+.scope-prompt p { margin: 0 0 0.6rem; color: #ccc; }
+.scope-prompt .scope-list { color: #997a00; font-family: monospace; font-size: 0.8rem; }
+.scope-prompt a { color: #1db954; }
 
 /* -- Explorer tab -- */
 .explorer-row {

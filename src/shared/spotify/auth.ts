@@ -14,6 +14,7 @@ export interface TokenSet {
   accessToken: string;
   refreshToken: string;
   expiresAt: Date;
+  scope: string;
 }
 
 export async function exchangeCode(code: string, redirectUri: string): Promise<TokenSet> {
@@ -40,6 +41,7 @@ export async function exchangeCode(code: string, redirectUri: string): Promise<T
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
     expiresAt: new Date(Date.now() + data.expires_in * 1000),
+    scope: data.scope,
   };
 }
 
@@ -64,5 +66,6 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenSet
     // Spotify may or may not return a new refresh token; keep the old one if not
     refreshToken: data.refresh_token ?? refreshToken,
     expiresAt: new Date(Date.now() + data.expires_in * 1000),
+    scope: data.scope,
   };
 }

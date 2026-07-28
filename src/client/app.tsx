@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import * as api from './api';
 import { ApiError } from './api';
-import type { PollState, LastfmStatus, NowPlayingData, HistoryItem } from './types';
+import type { PollState, LastfmStatus, NowPlayingData, HistoryItem, LikedSyncStatus, LikedSyncItem } from './types';
 import { useInterval } from './hooks/useInterval';
 import { Header } from './components/Header';
 import { NowPlaying } from './components/NowPlaying';
 import { HistoryTab } from './components/HistoryTab';
 import { ExplorerTab } from './components/ExplorerTab';
+import { LikedSyncTab } from './components/LikedSyncTab';
 import { ScrobblePreviewModal } from './components/ScrobblePreviewModal';
 
 const LIMIT = 50;
@@ -37,8 +38,13 @@ export function App() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [scrobbledIds, setScrobbledIds] = useState<Set<string>>(new Set());
 
+  // Liked sync — a scan costs real API calls, so its results outlive tab switches
+  const [likedSyncStatus, setLikedSyncStatus] = useState<LikedSyncStatus | null>(null);
+  const [likedSyncItems, setLikedSyncItems] = useState<LikedSyncItem[]>([]);
+  const [likedSyncSelected, setLikedSyncSelected] = useState<Set<string>>(new Set());
+
   // Tabs
-  const [activeTab, setActiveTab] = useState<'history' | 'explorer'>('history');
+  const [activeTab, setActiveTab] = useState<'history' | 'liked-sync' | 'explorer'>('history');
 
   // Preview modal
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -115,6 +121,11 @@ export function App() {
     }
   }, [authenticated, nowPlayingEnabled]);
 
+  const refreshLikedSync = useCallback(async () => {
+    const status = await withConnectionTracking(() => api.getLikedSyncStatus());
+    if (status) setLikedSyncStatus(status);
+  }, []);
+
   const loadHistory = useCallback(async (reset: boolean) => {
     if (!authenticated) return;
     const newOffset = reset ? 0 : historyOffset;
@@ -162,6 +173,16 @@ export function App() {
     }
     init();
   }, []);
+
+  // Load the liked-sync tab's state the first time it's opened, so its cost is
+  // only paid by users who use it.
+  useEffect(() => {
+    if (!authenticated || activeTab !== 'liked-sync' || likedSyncStatus) return;
+    refreshLikedSync();
+    withConnectionTracking(() => api.getLikedSyncPending(LIMIT, 0)).then((data) => {
+      if (data) setLikedSyncItems(data.items);
+    });
+  }, [authenticated, activeTab, likedSyncStatus, refreshLikedSync]);
 
   // -- Timers --
 
@@ -295,6 +316,12 @@ export function App() {
               History
             </button>
             <button
+              class={`tab ${activeTab === 'liked-sync' ? 'active' : ''}`}
+              onClick={() => setActiveTab('liked-sync')}
+            >
+              Liked Sync
+            </button>
+            <button
               class={`tab ${activeTab === 'explorer' ? 'active' : ''}`}
               onClick={() => setActiveTab('explorer')}
             >
@@ -302,7 +329,7 @@ export function App() {
             </button>
           </div>
 
-          {activeTab === 'history' ? (
+          {activeTab === 'history' && (
             <HistoryTab
               items={historyItems}
               selectedIds={selectedIds}
@@ -314,9 +341,20 @@ export function App() {
               onScrobble={handleScrobble}
               scrobbledIds={scrobbledIds}
             />
-          ) : (
-            <ExplorerTab />
           )}
+
+          {activeTab === 'liked-sync' && (
+            <LikedSyncTab
+              status={likedSyncStatus}
+              items={likedSyncItems}
+              selectedIds={likedSyncSelected}
+              onItemsChange={setLikedSyncItems}
+              onSelectionChange={setLikedSyncSelected}
+              onStatusRefresh={refreshLikedSync}
+            />
+          )}
+
+          {activeTab === 'explorer' && <ExplorerTab />}
 
           <ScrobblePreviewModal
             ids={previewIds}

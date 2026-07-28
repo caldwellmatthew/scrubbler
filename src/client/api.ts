@@ -1,4 +1,4 @@
-import type { AuthStatus, PollState, LastfmStatus, ToggleState, HistoryItem, NowPlayingData, PreviewItem } from './types';
+import type { AuthStatus, PollState, LastfmStatus, ToggleState, HistoryItem, NowPlayingData, PreviewItem, LikedSyncStatus, LikedSyncItem } from './types';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -117,6 +117,32 @@ export interface IgnoredScrobble {
 
 export async function submitScrobble(ids: string[], overrides: Record<string, { track: string; album: string }>): Promise<{ ok: boolean; scrobbled?: number; ignored?: IgnoredScrobble[]; error?: string }> {
   return post('/lastfm/scrobble', { ids, overrides });
+}
+
+export async function getLikedSyncStatus(): Promise<LikedSyncStatus> {
+  return get('/liked-sync/status');
+}
+
+export async function getLikedSyncPending(limit: number, offset: number): Promise<{ items: LikedSyncItem[] }> {
+  return get(`/liked-sync/pending?limit=${limit}&offset=${offset}`);
+}
+
+export async function scanLovedTracks(limit: number, retryUnmatched = false): Promise<{
+  ok: boolean;
+  lovedFetched: number;
+  lovedNew: number;
+  searched: number;
+  items: LikedSyncItem[];
+  remaining: number;
+}> {
+  return post('/liked-sync/scan', { limit, retryUnmatched });
+}
+
+export async function applyLikedSync(
+  confirm: Array<{ id: string; spotifyTrackId?: string }>,
+  reject: string[],
+): Promise<{ ok: boolean; liked: number; rejected: number; failed: Array<{ id: string; reason: string }> }> {
+  return post('/liked-sync/apply', { confirm, reject });
 }
 
 export async function proxySpotifyRequest(endpoint: string, query?: string): Promise<{ status: number; data: unknown }> {
