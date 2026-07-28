@@ -7,6 +7,7 @@ export interface OAuthToken {
   accessToken: string;
   refreshToken: string;
   expiresAt: Date;
+  scope: string | null; // null for grants recorded before scopes were tracked
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,6 +54,53 @@ export interface LastfmSession {
   nowPlayingEnabled: boolean;
 }
 
+// 'synced' means we saved it; 'already_liked' means it was in the library
+// before we got there. 'no_match' is soft-terminal — skipped by default, but
+// revisited on an explicit retry, since the catalog and the matcher both change.
+export type LovedMatchStatus = 'pending' | 'synced' | 'already_liked' | 'rejected' | 'no_match';
+
+export interface LovedMatchCandidate {
+  spotifyTrackId: string;
+  name: string;
+  artistNames: string[];
+  albumName: string;
+  score: number;
+}
+
+/** A Spotify track resolved for a loved track, ready to persist. */
+export interface ResolvedMatch {
+  spotifyTrackId: string;
+  name: string;
+  artistNames: string[];
+  albumName: string;
+  imageUrl: string | null;
+  externalUrl: string | null;
+  durationMs: number;
+  score: number;
+  candidates: LovedMatchCandidate[];
+}
+
+export interface LovedMatchRow {
+  id: string;
+  spotifyUserId: string;
+  lastfmUsername: string;
+  lastfmArtist: string;
+  lastfmTrack: string;
+  lovedAt: Date | null;
+  status: LovedMatchStatus;
+  spotifyTrackId: string | null;
+  spotifyTrackName: string | null;
+  spotifyArtistNames: string[] | null;
+  spotifyAlbumName: string | null;
+  spotifyImageUrl: string | null;
+  spotifyExternalUrl: string | null;
+  spotifyDurationMs: number | null;
+  matchScore: number | null;
+  candidates: LovedMatchCandidate[];
+  searchedAt: Date | null;
+  syncedAt: Date | null;
+}
+
 export interface PollState {
   spotifyUserId: string;
   lastPlayedAtMs: number | null;
@@ -81,12 +129,20 @@ export interface SpotifyAlbum {
 
 export interface SpotifyTrack {
   id: string;
+  uri: string;
   name: string;
   artists: SpotifyArtist[];
   album: SpotifyAlbum;
   duration_ms: number;
   external_urls: { spotify: string };
   preview_url: string | null;
+}
+
+export interface SpotifySearchResponse {
+  tracks?: {
+    items: SpotifyTrack[];
+    total: number;
+  };
 }
 
 export interface SpotifyPlayHistoryItem {

@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { config } from '../../shared/config';
 import { exchangeCode } from '../../shared/spotify/auth';
 import { fetchUserProfile } from '../../shared/spotify/client';
+import { SPOTIFY_SCOPES } from '../../shared/spotify/scopes';
 import * as tokenRepo from '../../shared/repositories/tokenRepo';
 import { requireAuth } from '../middleware/auth';
 
@@ -43,7 +44,6 @@ setInterval(() => {
 }, STATE_TTL_MS);
 
 const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
-const SCOPES = ['user-read-recently-played', 'user-read-currently-playing', 'user-read-playback-state', 'user-read-private', 'user-read-email'].join(' ');
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -94,7 +94,7 @@ authRouter.get('/login', (req, res) => {
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: config.spotifyClientId,
-    scope: SCOPES,
+    scope: SPOTIFY_SCOPES.join(' '),
     redirect_uri: redirectUri,
     state,
   });
@@ -133,6 +133,7 @@ authRouter.get('/callback', async (req, res, next) => {
       tokenSet.accessToken,
       tokenSet.refreshToken,
       tokenSet.expiresAt,
+      tokenSet.scope,
     );
 
     console.log(`[auth] Successfully authenticated Spotify user: ${profile.id}`);

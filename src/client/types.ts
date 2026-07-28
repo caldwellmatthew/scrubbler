@@ -60,3 +60,56 @@ export interface LastfmStatus {
 export interface ToggleState {
   enabled: boolean;
 }
+
+export interface LikedSyncCounts {
+  pending: number;
+  synced: number;
+  already_liked: number;
+  rejected: number;
+  no_match: number;
+}
+
+export interface LikedSyncStatus {
+  lastfmEnabled: boolean;
+  lastfmConnected: boolean;
+  lastfmUsername: string | null;
+  spotifyScopesOk: boolean;
+  missingScopes: string[];
+  counts: LikedSyncCounts;
+  unsearched: number;
+  totalMirrored: number;
+  lastScanAt: string | null;
+}
+
+export interface LikedSyncMatch {
+  spotifyTrackId: string;
+  name: string;
+  artistName: string;
+  albumName: string;
+  imageUrl: string | null;
+  externalUrl: string | null;
+  durationMs: number | null;
+}
+
+export interface LikedSyncAlternate {
+  spotifyTrackId: string;
+  name: string;
+  artistName: string;
+  albumName: string;
+  score: number;
+}
+
+export interface LikedSyncItem {
+  id: string;
+  lastfmArtist: string;
+  lastfmTrack: string;
+  lovedAt: string | null;
+  status: string;
+  confidence: 'high' | 'medium' | 'low' | null;
+  score: number | null;
+  alreadyLiked: boolean;
+  match: LikedSyncMatch | null;
+  alternates: LikedSyncAlternate[];
+  // Set locally when the user picks an alternate version; not sent by the API.
+  chosenTrackId?: string;
+}

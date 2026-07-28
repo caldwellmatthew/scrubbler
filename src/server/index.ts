@@ -7,6 +7,7 @@ import { historyRouter } from './routes/history';
 import { pollRouter } from './routes/poll';
 import { explorerRouter } from './routes/explorer';
 import { lastfmRouter } from './routes/lastfm';
+import { likedSyncRouter } from './routes/likedSync';
 import { nowPlayingRouter } from './routes/nowPlaying';
 import { errorHandler } from './middleware/errorHandler';
 import { requireAuth } from './middleware/auth';
@@ -36,6 +37,7 @@ app.use('/history', requireAuth, historyRouter);
 app.use('/poll', requireAuth, pollRouter);
 app.use('/explorer', requireAuth, explorerRouter);
 app.use('/lastfm', requireAuth, lastfmRouter);
+app.use('/liked-sync', requireAuth, likedSyncRouter);
 
 // Production: serve Vite-built client
 if (process.env.NODE_ENV === 'production') {

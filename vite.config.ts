@@ -11,7 +11,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: Object.fromEntries(
-      ['/auth', '/health', '/history', '/now-playing', '/poll', '/lastfm', '/explorer'].map(
+      ['/auth', '/health', '/history', '/now-playing', '/poll', '/lastfm', '/liked-sync', '/explorer'].map(
         (path) => [path, { target: 'http://127.0.0.1:3000', changeOrigin: true }],
       ),
     ),

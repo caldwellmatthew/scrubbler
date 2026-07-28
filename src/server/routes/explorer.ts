@@ -1,13 +1,11 @@
 import { Router } from 'express';
 import axios, { AxiosError } from 'axios';
 import * as tokenRepo from '../../shared/repositories/tokenRepo';
-import { refreshAccessToken } from '../../shared/spotify/auth';
-import { updateTokens } from '../../shared/repositories/tokenRepo';
+import { getValidToken } from '../../shared/spotify/client';
 
 export const explorerRouter = Router();
 
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
-const REFRESH_BUFFER_MS = 60 * 1000;
 const REQUEST_TIMEOUT_MS = 10_000;
 
 // GET /explorer/proxy?endpoint=/me/player/recently-played&limit=5
@@ -26,13 +24,7 @@ explorerRouter.get('/proxy', async (req, res, next) => {
       return;
     }
 
-    // Refresh token if needed
-    let accessToken = token.accessToken;
-    if (token.expiresAt.getTime() - Date.now() <= REFRESH_BUFFER_MS) {
-      const refreshed = await refreshAccessToken(token.refreshToken);
-      await updateTokens(token.spotifyUserId, refreshed.accessToken, refreshed.refreshToken, refreshed.expiresAt);
-      accessToken = refreshed.accessToken;
-    }
+    const accessToken = await getValidToken(token);
 
     const url = `${SPOTIFY_API_BASE}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
 

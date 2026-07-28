@@ -8,7 +8,7 @@ interface ScrobbleBarProps {
 
 export function ScrobbleBar({ selectedCount, visible, onScrobble, onSelectAlbum, onClear }: ScrobbleBarProps) {
   return (
-    <div id="scrobble-bar" class={visible ? 'visible' : ''}>
+    <div id="scrobble-bar" class={`action-bar ${visible ? 'visible' : ''}`}>
       <span>{selectedCount} selected</span>
       <button id="scrobble-btn" onClick={onScrobble}>Scrobble to Last.fm</button>
       <button id="select-album-btn" onClick={onSelectAlbum}>Select album</button>
