@@ -184,6 +184,35 @@ export async function getUnscrobbledByPlayedAts(spotifyUserId: string, playedAts
   return result.rows.map(mapRow);
 }
 
+/**
+ * For each given play, the played_at of the nearest earlier play of the same
+ * track by the same user. Plays with no earlier play of that track are absent
+ * from the map. Keyed by listen_history id.
+ */
+export async function getPriorSameTrackPlays(
+  spotifyUserId: string,
+  ids: string[],
+): Promise<Map<string, Date>> {
+  if (ids.length === 0) return new Map();
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT lh.id,
+            (SELECT max(prior.played_at)
+               FROM listen_history prior
+              WHERE prior.spotify_user_id = lh.spotify_user_id
+                AND prior.spotify_track_id = lh.spotify_track_id
+                AND prior.played_at < lh.played_at) AS prior_played_at
+       FROM listen_history lh
+      WHERE lh.id = ANY($1) AND lh.spotify_user_id = $2`,
+    [ids, spotifyUserId],
+  );
+  const priors = new Map<string, Date>();
+  for (const row of result.rows) {
+    if (row.prior_played_at) priors.set(String(row.id), row.prior_played_at as Date);
+  }
+  return priors;
+}
+
 export async function markScrobbled(ids: string[], sanitized: boolean): Promise<void> {
   if (ids.length === 0) return;
   const pool = getPool();

@@ -3,6 +3,41 @@ import type { ScrobbleItem, ScrobbleResult } from './client';
 import { cleanName } from './clean';
 import * as historyRepo from '../repositories/historyRepo';
 
+export interface DuplicatePlay {
+  row: ListenHistoryRow;
+  priorPlayedAt: Date;
+}
+
+export const DUPLICATE_PLAY_REASON = 'Repeat of an earlier play of the same track';
+
+/**
+ * Split plays into those worth scrobbling and those that repeat an earlier play
+ * of the same track sooner than that track could have finished.
+ *
+ * Two plays of one track logged closer together than its own duration cannot
+ * both be complete listens; Spotify records a single listen twice when it is
+ * seeked or restarted. Only the first of such a group is a real play.
+ *
+ * `priorPlays` maps a row id to the played_at of the nearest earlier play of
+ * the same track, as returned by historyRepo.getPriorSameTrackPlays.
+ */
+export function partitionDuplicatePlays(
+  rows: ListenHistoryRow[],
+  priorPlays: Map<string, Date>,
+): { kept: ListenHistoryRow[]; duplicates: DuplicatePlay[] } {
+  const kept: ListenHistoryRow[] = [];
+  const duplicates: DuplicatePlay[] = [];
+  for (const row of rows) {
+    const priorPlayedAt = priorPlays.get(String(row.id));
+    if (priorPlayedAt && row.playedAt.getTime() - priorPlayedAt.getTime() < row.durationMs) {
+      duplicates.push({ row, priorPlayedAt });
+    } else {
+      kept.push(row);
+    }
+  }
+  return { kept, duplicates };
+}
+
 /**
  * Build ScrobbleItems from history rows, optionally applying sanitization
  * and per-row overrides (from the preview modal).
