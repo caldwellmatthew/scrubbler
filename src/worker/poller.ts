@@ -3,7 +3,7 @@ import * as trackRepo from '../shared/repositories/trackRepo';
 import * as historyRepo from '../shared/repositories/historyRepo';
 import * as lastfmRepo from '../shared/repositories/lastfmRepo';
 import * as lastfmClient from '../shared/lastfm/client';
-import { buildScrobbleItems, markScrobbledWithSanitizeInfo, buildNowPlayingPayload } from '../shared/lastfm/scrobble';
+import { buildScrobbleItems, markScrobbledWithSanitizeInfo, buildNowPlayingPayload, partitionDuplicatePlays } from '../shared/lastfm/scrobble';
 import { fetchRecentlyPlayed, fetchCurrentlyPlaying } from '../shared/spotify/client';
 import { getPool } from '../shared/db';
 import type { ListenEvent, OAuthToken, Track } from '../shared/types';
@@ -90,7 +90,15 @@ async function pollUser(token: OAuthToken): Promise<void> {
   const session = await lastfmRepo.getSession(spotifyUserId);
   if (session?.autoScrobbleEnabled && events.length > 0) {
     try {
-      const rows = await historyRepo.getUnscrobbledByPlayedAts(spotifyUserId, events.map(e => e.playedAt));
+      const candidates = await historyRepo.getUnscrobbledByPlayedAts(spotifyUserId, events.map(e => e.playedAt));
+      const priorPlays = await historyRepo.getPriorSameTrackPlays(spotifyUserId, candidates.map(r => r.id));
+      const { kept: rows, duplicates } = partitionDuplicatePlays(candidates, priorPlays);
+      duplicates.forEach(({ row, priorPlayedAt }) => {
+        console.log(
+          `[worker] ${tag} Skipping "${row.name}" by ${row.artistNames[0]} — repeat of the play at ` +
+          `${priorPlayedAt.toISOString()}, sooner than its ${Math.round(row.durationMs / 1000)}s duration`,
+        );
+      });
       if (rows.length > 0) {
         rows.sort((a, b) => a.playedAt.getTime() - b.playedAt.getTime());
         const scrobbleItems = buildScrobbleItems(rows, { sanitize: session.sanitizeScrobble });

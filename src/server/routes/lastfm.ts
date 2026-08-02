@@ -7,7 +7,7 @@ import * as historyRepo from '../../shared/repositories/historyRepo';
 import * as tokenRepo from '../../shared/repositories/tokenRepo';
 import { fetchCurrentlyPlaying } from '../../shared/spotify/client';
 import { cleanName } from '../../shared/lastfm/clean';
-import { buildScrobbleItems, markScrobbledWithSanitizeInfo, buildNowPlayingPayload } from '../../shared/lastfm/scrobble';
+import { buildScrobbleItems, markScrobbledWithSanitizeInfo, buildNowPlayingPayload, partitionDuplicatePlays, DUPLICATE_PLAY_REASON } from '../../shared/lastfm/scrobble';
 
 export const lastfmRouter = Router();
 
@@ -196,9 +196,19 @@ lastfmRouter.post('/scrobble', async (req, res, next) => {
       res.status(400).json({ error: 'ids must be a non-empty array' });
       return;
     }
-    const rows = await historyRepo.getByIds(ids, spotifyUserId);
+    const candidates = await historyRepo.getByIds(ids, spotifyUserId);
+    const priorPlays = await historyRepo.getPriorSameTrackPlays(spotifyUserId, candidates.map(r => r.id));
+    const { kept: rows, duplicates } = partitionDuplicatePlays(candidates, priorPlays);
+    const skipped = duplicates.map(({ row }) => ({
+      id: String(row.id),
+      artist: row.artistNames[0],
+      track: row.name,
+      reason: DUPLICATE_PLAY_REASON,
+    }));
     const items = buildScrobbleItems(rows, { overrides });
-    const results = await lastfmClient.scrobble(items, session.sessionKey);
+    const results = items.length > 0
+      ? await lastfmClient.scrobble(items, session.sessionKey)
+      : [];
     await markScrobbledWithSanitizeInfo(rows, items, results);
     const ignored = results.flatMap((result, i) =>
       result.accepted
@@ -210,7 +220,9 @@ lastfmRouter.post('/scrobble', async (req, res, next) => {
             reason: result.ignoredReason,
           }],
     );
-    res.json({ ok: true, scrobbled: items.length - ignored.length, ignored });
+    const scrobbled = items.length - ignored.length;
+    ignored.push(...skipped);
+    res.json({ ok: true, scrobbled, ignored });
   } catch (err) {
     next(err);
   }
