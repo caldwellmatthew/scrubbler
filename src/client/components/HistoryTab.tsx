@@ -138,9 +138,12 @@ export function HistoryTab({
             <tbody onMouseDown={onMouseDown} onClick={onRowClick}>
               {items.map((item) => {
                 const isScrobbled = !!item.scrobbledAt || scrobbledIds.has(item.id);
+                // Still selectable when skipped, so it can be forced through
+                const skippedReason = isScrobbled ? null : item.scrobbleSkippedReason;
                 const isSelected = selectedIds.has(item.id);
                 const cls = [
                   isScrobbled ? 'scrobbled' : '',
+                  skippedReason ? 'skipped' : '',
                   isSelected ? 'selected' : '',
                 ].filter(Boolean).join(' ');
 
@@ -163,6 +166,10 @@ export function HistoryTab({
                               : 'Scrobbled'
                         }>
                           {(item.scrobbleSanitized ?? (scrobbledIds.has(item.id) || null)) === true ? '✓S' : '✓'}
+                        </span>
+                      ) : skippedReason ? (
+                        <span class="scrobble-badge skipped" title={`Not scrobbled — ${skippedReason}. Select it and scrobble to send it anyway.`}>
+                          ⊘
                         </span>
                       ) : (
                         <span class="scrobble-badge-spacer" />

@@ -161,6 +161,9 @@ tr.scrobbled.selected:hover td { background: #1e3020; }
   opacity: 0.8;
   text-align: center;
 }
+.scrobble-badge.skipped { color: #b0883c; }
+tr.skipped td { opacity: 0.75; }
+tr.skipped td.check-cell { opacity: 1; }
 .scrobble-badge-spacer {
   display: inline-block;
   width: 1.2rem;
