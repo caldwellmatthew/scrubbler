@@ -41,6 +41,8 @@ export interface ListenHistoryRow extends ListenEvent {
   imageUrl: string | null;
   scrobbledAt: Date | null;
   scrobbleSanitized: boolean | null;
+  /** Why this play was deliberately not sent to Last.fm; null if it never was. */
+  scrobbleSkippedReason: string | null;
 }
 
 /** The play immediately preceding another play of the same track. */

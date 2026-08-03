@@ -11,6 +11,8 @@ export interface HistoryItem {
   playedAt: string;
   scrobbledAt: string | null;
   scrobbleSanitized: boolean | null;
+  /** Why this play was deliberately not sent to Last.fm; null if it never was. */
+  scrobbleSkippedReason: string | null;
   track: Track;
 }
 
