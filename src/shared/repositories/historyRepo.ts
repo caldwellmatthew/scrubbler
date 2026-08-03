@@ -1,6 +1,6 @@
 import { getPool } from '../db';
 import type { PoolClient } from 'pg';
-import type { HistoryQueryParams, ListenEvent, ListenHistoryRow, PollState } from '../types';
+import type { HistoryQueryParams, ListenEvent, ListenHistoryRow, PollState, PriorPlay } from '../types';
 
 export async function getPollState(spotifyUserId: string): Promise<PollState> {
   const pool = getPool();
@@ -185,30 +185,41 @@ export async function getUnscrobbledByPlayedAts(spotifyUserId: string, playedAts
 }
 
 /**
- * For each given play, the played_at of the nearest earlier play of the same
- * track by the same user. Plays with no earlier play of that track are absent
- * from the map. Keyed by listen_history id.
+ * For each given play, the nearest earlier play of the same track by the same
+ * user, along with whether that earlier play has already been scrobbled. Plays
+ * with no earlier play of that track are absent from the map. Keyed by
+ * listen_history id.
  */
 export async function getPriorSameTrackPlays(
   spotifyUserId: string,
   ids: string[],
-): Promise<Map<string, Date>> {
+): Promise<Map<string, PriorPlay>> {
   if (ids.length === 0) return new Map();
   const pool = getPool();
   const result = await pool.query(
-    `SELECT lh.id,
-            (SELECT max(prior.played_at)
-               FROM listen_history prior
-              WHERE prior.spotify_user_id = lh.spotify_user_id
-                AND prior.spotify_track_id = lh.spotify_track_id
-                AND prior.played_at < lh.played_at) AS prior_played_at
+    `SELECT lh.id, prior.played_at AS prior_played_at,
+            (prior.scrobbled_at IS NOT NULL) AS prior_scrobbled
        FROM listen_history lh
+       LEFT JOIN LATERAL (
+            SELECT p.played_at, p.scrobbled_at
+              FROM listen_history p
+             WHERE p.spotify_user_id = lh.spotify_user_id
+               AND p.spotify_track_id = lh.spotify_track_id
+               AND p.played_at < lh.played_at
+             ORDER BY p.played_at DESC
+             LIMIT 1
+       ) prior ON true
       WHERE lh.id = ANY($1) AND lh.spotify_user_id = $2`,
     [ids, spotifyUserId],
   );
-  const priors = new Map<string, Date>();
+  const priors = new Map<string, PriorPlay>();
   for (const row of result.rows) {
-    if (row.prior_played_at) priors.set(String(row.id), row.prior_played_at as Date);
+    if (row.prior_played_at) {
+      priors.set(String(row.id), {
+        playedAt: row.prior_played_at as Date,
+        scrobbled: row.prior_scrobbled as boolean,
+      });
+    }
   }
   return priors;
 }

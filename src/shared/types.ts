@@ -43,6 +43,13 @@ export interface ListenHistoryRow extends ListenEvent {
   scrobbleSanitized: boolean | null;
 }
 
+/** The play immediately preceding another play of the same track. */
+export interface PriorPlay {
+  playedAt: Date;
+  /** Whether a scrobble already exists for this play. */
+  scrobbled: boolean;
+}
+
 export interface LastfmSession {
   id: number;
   username: string;
