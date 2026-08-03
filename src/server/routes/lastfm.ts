@@ -188,16 +188,20 @@ lastfmRouter.post('/scrobble', async (req, res, next) => {
       res.status(401).json({ error: 'Not connected to Last.fm' });
       return;
     }
-    const { ids, overrides = {} } = req.body as {
+    const { ids, overrides = {}, force = false } = req.body as {
       ids: string[];
       overrides?: Record<string, { track?: string; album?: string }>;
+      force?: boolean;
     };
     if (!Array.isArray(ids) || ids.length === 0) {
       res.status(400).json({ error: 'ids must be a non-empty array' });
       return;
     }
     const candidates = await historyRepo.getByIds(ids, spotifyUserId);
-    const priorPlays = await historyRepo.getPriorSameTrackPlays(spotifyUserId, candidates.map(r => r.id));
+    // force submits everything asked for, so a misjudged duplicate stays recoverable
+    const priorPlays = force
+      ? new Map()
+      : await historyRepo.getPriorSameTrackPlays(spotifyUserId, candidates.map(r => r.id));
     const { kept: rows, duplicates } = partitionDuplicatePlays(candidates, priorPlays);
     const skipped = duplicates.map(({ row }) => ({
       id: String(row.id),
@@ -220,9 +224,8 @@ lastfmRouter.post('/scrobble', async (req, res, next) => {
             reason: result.ignoredReason,
           }],
     );
-    const scrobbled = items.length - ignored.length;
-    ignored.push(...skipped);
-    res.json({ ok: true, scrobbled, ignored });
+    // ignored was rejected by Last.fm; skipped was never sent, and force overrides it
+    res.json({ ok: true, scrobbled: items.length - ignored.length, ignored, skipped });
   } catch (err) {
     next(err);
   }

@@ -67,6 +67,31 @@ export function ScrobblePreviewModal({ ids, open, rescrobbleCount, onClose, onSc
     }
   }
 
+  /**
+   * Offer to resubmit plays the server declined to send. Returns the ids that
+   * Last.fm then accepted, or none if the offer was declined.
+   */
+  async function confirmForced(
+    skipped: api.SkippedScrobble[],
+    overrides: Record<string, { track: string; album: string }>,
+  ): Promise<string[]> {
+    const lines = skipped.map((s) => `"${s.track}" by ${s.artist} — ${s.reason}`);
+    const proceed = window.confirm(
+      `Skipped ${skipped.length} play${skipped.length === 1 ? '' : 's'}:\n\n` +
+      `${lines.join('\n')}\n\nScrobble anyway?`,
+    );
+    if (!proceed) return [];
+
+    const forcedIds = skipped.map((s) => s.id);
+    const forced = await api.submitScrobble(forcedIds, overrides, true);
+    if (!forced.ok) {
+      alert('Scrobble failed: ' + (forced.error || 'Unknown error'));
+      return [];
+    }
+    const rejected = new Set((forced.ignored ?? []).map((s) => s.id));
+    return forcedIds.filter((id) => !rejected.has(id));
+  }
+
   async function confirm() {
     const overrides: Record<string, { track: string; album: string }> = {};
     for (const row of rows) {
@@ -82,12 +107,18 @@ export function ScrobblePreviewModal({ ids, open, rescrobbleCount, onClose, onSc
         return;
       }
       const ignored = result.ignored ?? [];
+      const skipped = result.skipped ?? [];
+      const scrobbledIds = new Set(ids);
+      for (const s of [...ignored, ...skipped]) scrobbledIds.delete(s.id);
+
       if (ignored.length > 0) {
         const lines = ignored.map((s) => `"${s.track}" by ${s.artist} — ${s.reason || 'no reason given'}`);
         alert(`Last.fm ignored ${ignored.length} of ${ids.length} scrobbles:\n\n${lines.join('\n')}`);
       }
-      const ignoredIds = new Set(ignored.map((s) => s.id));
-      onScrobbled(ids.filter((id) => !ignoredIds.has(id)));
+      if (skipped.length > 0) {
+        for (const id of await confirmForced(skipped, overrides)) scrobbledIds.add(id);
+      }
+      onScrobbled([...scrobbledIds]);
     } catch (err: unknown) {
       alert('Scrobble failed: ' + (err instanceof Error ? err.message : String(err)));
     }
