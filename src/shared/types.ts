@@ -46,8 +46,11 @@ export interface ListenHistoryRow extends ListenEvent {
 /** The play immediately preceding another play of the same track. */
 export interface PriorPlay {
   playedAt: Date;
-  /** Whether a scrobble already exists for this play. */
-  scrobbled: boolean;
+  /**
+   * Whether this play's listen is already accounted for — scrobbled, or
+   * skipped because something earlier in the same run was.
+   */
+  covered: boolean;
 }
 
 export interface LastfmSession {

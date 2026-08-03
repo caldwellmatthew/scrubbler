@@ -24,8 +24,8 @@ function makeRow(overrides: Partial<ListenHistoryRow> = {}): ListenHistoryRow {
 describe('partitionDuplicatePlays', () => {
   const playedAt = new Date('2026-01-01T12:00:00.000Z');
   const secondsBefore = (n: number) => new Date(playedAt.getTime() - n * 1000);
-  const scrobbledAt = (n: number) => ({ playedAt: secondsBefore(n), scrobbled: true });
-  const unscrobbledAt = (n: number) => ({ playedAt: secondsBefore(n), scrobbled: false });
+  const coveredAt = (n: number) => ({ playedAt: secondsBefore(n), covered: true });
+  const uncoveredAt = (n: number) => ({ playedAt: secondsBefore(n), covered: false });
 
   it('keeps a play with no earlier play of the same track', () => {
     const row = makeRow({ playedAt });
@@ -34,9 +34,9 @@ describe('partitionDuplicatePlays', () => {
     expect(duplicates).toEqual([]);
   });
 
-  it('drops a play repeating a scrobbled listen the track could not have finished', () => {
+  it('drops a play repeating an accounted-for listen the track could not have finished', () => {
     const row = makeRow({ playedAt, durationMs: 180_000 });
-    const prior = scrobbledAt(120);
+    const prior = coveredAt(120);
     const { kept, duplicates } = partitionDuplicatePlays([row], new Map([[row.id, prior]]));
     expect(kept).toEqual([]);
     expect(duplicates).toEqual([{ row, priorPlayedAt: prior.playedAt }]);
@@ -46,7 +46,7 @@ describe('partitionDuplicatePlays', () => {
     const row = makeRow({ playedAt, durationMs: 180_000 });
     const { kept, duplicates } = partitionDuplicatePlays(
       [row],
-      new Map([[row.id, scrobbledAt(240)]]),
+      new Map([[row.id, coveredAt(240)]]),
     );
     expect(kept).toEqual([row]);
     expect(duplicates).toEqual([]);
@@ -54,15 +54,15 @@ describe('partitionDuplicatePlays', () => {
 
   it('keeps a play whose gap exactly equals the track duration', () => {
     const row = makeRow({ playedAt, durationMs: 180_000 });
-    const { kept } = partitionDuplicatePlays([row], new Map([[row.id, scrobbledAt(180)]]));
+    const { kept } = partitionDuplicatePlays([row], new Map([[row.id, coveredAt(180)]]));
     expect(kept).toEqual([row]);
   });
 
-  it('keeps a play whose earlier listen was never scrobbled, so one scrobble results', () => {
+  it('keeps a play whose earlier listen was never accounted for, so one scrobble results', () => {
     const row = makeRow({ playedAt, durationMs: 180_000 });
     const { kept, duplicates } = partitionDuplicatePlays(
       [row],
-      new Map([[row.id, unscrobbledAt(120)]]),
+      new Map([[row.id, uncoveredAt(120)]]),
     );
     expect(kept).toEqual([row]);
     expect(duplicates).toEqual([]);
@@ -90,7 +90,7 @@ describe('partitionDuplicatePlays', () => {
     const b = makeRow({ id: '2', spotifyTrackId: 'track-b', playedAt, durationMs: 180_000 });
     const { kept } = partitionDuplicatePlays(
       [a, b],
-      new Map([['1', scrobbledAt(120)]]),
+      new Map([['1', coveredAt(120)]]),
     );
     expect(kept).toEqual([b]);
   });
@@ -100,7 +100,7 @@ describe('partitionDuplicatePlays', () => {
     const long = makeRow({ id: '2', spotifyTrackId: 'b', playedAt, durationMs: 600_000 });
     const { kept, duplicates } = partitionDuplicatePlays(
       [short, long],
-      new Map([['1', scrobbledAt(120)], ['2', scrobbledAt(120)]]),
+      new Map([['1', coveredAt(120)], ['2', coveredAt(120)]]),
     );
     expect(kept).toEqual([short]);
     expect(duplicates.map((d) => d.row.id)).toEqual(['2']);
