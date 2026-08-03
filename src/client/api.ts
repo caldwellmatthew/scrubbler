@@ -115,8 +115,20 @@ export interface IgnoredScrobble {
   reason: string | null;
 }
 
-export async function submitScrobble(ids: string[], overrides: Record<string, { track: string; album: string }>): Promise<{ ok: boolean; scrobbled?: number; ignored?: IgnoredScrobble[]; error?: string }> {
-  return post('/lastfm/scrobble', { ids, overrides });
+/** A play the server declined to send, which force resubmits. */
+export interface SkippedScrobble {
+  id: string;
+  artist: string;
+  track: string;
+  reason: string;
+}
+
+export async function submitScrobble(
+  ids: string[],
+  overrides: Record<string, { track: string; album: string }>,
+  force = false,
+): Promise<{ ok: boolean; scrobbled?: number; ignored?: IgnoredScrobble[]; skipped?: SkippedScrobble[]; error?: string }> {
+  return post('/lastfm/scrobble', { ids, overrides, force });
 }
 
 export async function getLikedSyncStatus(): Promise<LikedSyncStatus> {
