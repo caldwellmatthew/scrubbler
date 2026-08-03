@@ -1,4 +1,4 @@
-import type { ListenHistoryRow } from '../types';
+import type { ListenHistoryRow, PriorPlay } from '../types';
 import type { ScrobbleItem, ScrobbleResult } from './client';
 import { cleanName } from './clean';
 import * as historyRepo from '../repositories/historyRepo';
@@ -11,29 +11,55 @@ export interface DuplicatePlay {
 export const DUPLICATE_PLAY_REASON = 'Repeat of an earlier play of the same track';
 
 /**
- * Split plays into those worth scrobbling and those that repeat an earlier play
- * of the same track sooner than that track could have finished.
+ * Split plays into those worth scrobbling and those that merely repeat a listen
+ * already accounted for.
  *
- * Two plays of one track logged closer together than its own duration cannot
- * both be complete listens; Spotify records a single listen twice when it is
- * seeked or restarted. Only the first of such a group is a real play.
+ * Spotify can log one listen more than once — shortly after it starts and again
+ * when it ends — so entries for the same track spaced closer together than that
+ * track's own duration describe a single listen rather than several. Such a run
+ * should produce exactly one scrobble.
  *
- * `priorPlays` maps a row id to the played_at of the nearest earlier play of
- * the same track, as returned by historyRepo.getPriorSameTrackPlays.
+ * The run's *last* entry marks the true end of the listen, but we keep the
+ * first: later entries may not exist yet when the earlier one is scrobbled, so
+ * anchoring on the first is the only choice available in the polling path. The
+ * cost is a timestamp early by up to a track length.
+ *
+ * A run is only suppressed once something in it has been scrobbled. An earlier
+ * play that was never sent to Last.fm cannot stand in for this one, or a real
+ * listen would end up with no scrobble at all.
+ *
+ * `priorPlays` maps a row id to the nearest earlier play of the same track, as
+ * returned by historyRepo.getPriorSameTrackPlays.
  */
 export function partitionDuplicatePlays(
   rows: ListenHistoryRow[],
-  priorPlays: Map<string, Date>,
+  priorPlays: Map<string, PriorPlay>,
 ): { kept: ListenHistoryRow[]; duplicates: DuplicatePlay[] } {
   const kept: ListenHistoryRow[] = [];
   const duplicates: DuplicatePlay[] = [];
-  for (const row of rows) {
-    const priorPlayedAt = priorPlays.get(String(row.id));
-    if (priorPlayedAt && row.playedAt.getTime() - priorPlayedAt.getTime() < row.durationMs) {
-      duplicates.push({ row, priorPlayedAt });
+  // Plays decided earlier in this batch, which the stored prior does not know about
+  const decidedByTrack = new Map<string, PriorPlay>();
+
+  const chronological = [...rows].sort((a, b) => a.playedAt.getTime() - b.playedAt.getTime());
+  for (const row of chronological) {
+    const stored = priorPlays.get(String(row.id));
+    const decided = decidedByTrack.get(row.spotifyTrackId);
+    // Whichever prior play is nearer is the one this play could be repeating
+    const prior = stored && decided
+      ? (stored.playedAt > decided.playedAt ? stored : decided)
+      : stored ?? decided;
+
+    const repeatsCoveredListen = prior !== undefined
+      && prior.scrobbled
+      && row.playedAt.getTime() - prior.playedAt.getTime() < row.durationMs;
+
+    if (repeatsCoveredListen) {
+      duplicates.push({ row, priorPlayedAt: prior.playedAt });
     } else {
       kept.push(row);
     }
+    // Either way this listen now has a scrobble, so later entries in the run repeat it
+    decidedByTrack.set(row.spotifyTrackId, { playedAt: row.playedAt, scrobbled: true });
   }
   return { kept, duplicates };
 }
