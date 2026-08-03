@@ -122,6 +122,23 @@ async function main(): Promise<void> {
       return;
     }
 
+    // A pending file sorting before one already applied would run out of order,
+    // leaving this database with a different application order than one built
+    // fresh from the same tree. It normally means two branches numbered their
+    // migrations independently. Refuse, so the file gets renumbered rather than
+    // silently diverging.
+    const latestApplied = [...applied.keys()].sort().pop();
+    const outOfOrder = latestApplied === undefined
+      ? []
+      : pending.filter((m) => m.filename < latestApplied);
+    if (outOfOrder.length > 0) {
+      throw new Error(
+        `Migration(s) sort before ${latestApplied}, which is already applied: ` +
+          `${outOfOrder.map((m) => m.filename).join(', ')}. ` +
+          'Renumber them to follow the applied migrations, then run again.',
+      );
+    }
+
     for (const { filename, sql, checksum } of pending) {
       try {
         await client.query('BEGIN');
