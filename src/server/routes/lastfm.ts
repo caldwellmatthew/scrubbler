@@ -209,6 +209,8 @@ lastfmRouter.post('/scrobble', async (req, res, next) => {
       track: row.name,
       reason: DUPLICATE_PLAY_REASON,
     }));
+    // Recorded so a further entry in the same run does not scrobble it again
+    await historyRepo.markSkipped(skipped.map((s) => s.id), DUPLICATE_PLAY_REASON);
     const items = buildScrobbleItems(rows, { overrides });
     const results = items.length > 0
       ? await lastfmClient.scrobble(items, session.sessionKey)

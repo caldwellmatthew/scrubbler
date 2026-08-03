@@ -186,9 +186,10 @@ export async function getUnscrobbledByPlayedAts(spotifyUserId: string, playedAts
 
 /**
  * For each given play, the nearest earlier play of the same track by the same
- * user, along with whether that earlier play has already been scrobbled. Plays
- * with no earlier play of that track are absent from the map. Keyed by
- * listen_history id.
+ * user, along with whether that earlier play's listen is already accounted for.
+ * A play counts as covered once it has been scrobbled, or skipped for repeating
+ * something that was. Plays with no earlier play of that track are absent from
+ * the map. Keyed by listen_history id.
  */
 export async function getPriorSameTrackPlays(
   spotifyUserId: string,
@@ -198,10 +199,11 @@ export async function getPriorSameTrackPlays(
   const pool = getPool();
   const result = await pool.query(
     `SELECT lh.id, prior.played_at AS prior_played_at,
-            (prior.scrobbled_at IS NOT NULL) AS prior_scrobbled
+            (prior.scrobbled_at IS NOT NULL
+             OR prior.scrobble_skipped_reason IS NOT NULL) AS prior_covered
        FROM listen_history lh
        LEFT JOIN LATERAL (
-            SELECT p.played_at, p.scrobbled_at
+            SELECT p.played_at, p.scrobbled_at, p.scrobble_skipped_reason
               FROM listen_history p
              WHERE p.spotify_user_id = lh.spotify_user_id
                AND p.spotify_track_id = lh.spotify_track_id
@@ -217,18 +219,31 @@ export async function getPriorSameTrackPlays(
     if (row.prior_played_at) {
       priors.set(String(row.id), {
         playedAt: row.prior_played_at as Date,
-        scrobbled: row.prior_scrobbled as boolean,
+        covered: row.prior_covered as boolean,
       });
     }
   }
   return priors;
 }
 
-export async function markScrobbled(ids: string[], sanitized: boolean): Promise<void> {
+/** Record why plays were deliberately not sent to Last.fm. */
+export async function markSkipped(ids: string[], reason: string): Promise<void> {
   if (ids.length === 0) return;
   const pool = getPool();
   await pool.query(
-    'UPDATE listen_history SET scrobbled_at = NOW(), scrobble_sanitized = $2 WHERE id = ANY($1)',
+    'UPDATE listen_history SET scrobble_skipped_reason = $2 WHERE id = ANY($1)',
+    [ids, reason],
+  );
+}
+
+export async function markScrobbled(ids: string[], sanitized: boolean): Promise<void> {
+  if (ids.length === 0) return;
+  const pool = getPool();
+  // Clearing any skip reason: a scrobbled play is no longer a skipped one
+  await pool.query(
+    `UPDATE listen_history
+        SET scrobbled_at = NOW(), scrobble_sanitized = $2, scrobble_skipped_reason = NULL
+      WHERE id = ANY($1)`,
     [ids, sanitized],
   );
 }

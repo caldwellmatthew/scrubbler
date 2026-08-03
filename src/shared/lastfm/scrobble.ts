@@ -24,9 +24,10 @@ export const DUPLICATE_PLAY_REASON = 'Repeat of an earlier play of the same trac
  * anchoring on the first is the only choice available in the polling path. The
  * cost is a timestamp early by up to a track length.
  *
- * A run is only suppressed once something in it has been scrobbled. An earlier
- * play that was never sent to Last.fm cannot stand in for this one, or a real
- * listen would end up with no scrobble at all.
+ * A run is only suppressed once something in it is accounted for — scrobbled,
+ * or skipped because an earlier entry was. A play that was never sent to
+ * Last.fm at all cannot stand in for this one, or a real listen would end up
+ * with no scrobble.
  *
  * `priorPlays` maps a row id to the nearest earlier play of the same track, as
  * returned by historyRepo.getPriorSameTrackPlays.
@@ -50,7 +51,7 @@ export function partitionDuplicatePlays(
       : stored ?? decided;
 
     const repeatsCoveredListen = prior !== undefined
-      && prior.scrobbled
+      && prior.covered
       && row.playedAt.getTime() - prior.playedAt.getTime() < row.durationMs;
 
     if (repeatsCoveredListen) {
@@ -58,8 +59,8 @@ export function partitionDuplicatePlays(
     } else {
       kept.push(row);
     }
-    // Either way this listen now has a scrobble, so later entries in the run repeat it
-    decidedByTrack.set(row.spotifyTrackId, { playedAt: row.playedAt, scrobbled: true });
+    // Either way this listen is now accounted for, so later entries repeat it
+    decidedByTrack.set(row.spotifyTrackId, { playedAt: row.playedAt, covered: true });
   }
   return { kept, duplicates };
 }

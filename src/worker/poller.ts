@@ -3,7 +3,7 @@ import * as trackRepo from '../shared/repositories/trackRepo';
 import * as historyRepo from '../shared/repositories/historyRepo';
 import * as lastfmRepo from '../shared/repositories/lastfmRepo';
 import * as lastfmClient from '../shared/lastfm/client';
-import { buildScrobbleItems, markScrobbledWithSanitizeInfo, buildNowPlayingPayload, partitionDuplicatePlays } from '../shared/lastfm/scrobble';
+import { buildScrobbleItems, markScrobbledWithSanitizeInfo, buildNowPlayingPayload, partitionDuplicatePlays, DUPLICATE_PLAY_REASON } from '../shared/lastfm/scrobble';
 import { fetchRecentlyPlayed, fetchCurrentlyPlaying } from '../shared/spotify/client';
 import { getPool } from '../shared/db';
 import type { ListenEvent, OAuthToken, Track } from '../shared/types';
@@ -99,6 +99,8 @@ async function pollUser(token: OAuthToken): Promise<void> {
           `${priorPlayedAt.toISOString()}, sooner than its ${Math.round(row.durationMs / 1000)}s duration`,
         );
       });
+      // Recorded so a further entry in the same run does not scrobble it again
+      await historyRepo.markSkipped(duplicates.map(({ row }) => String(row.id)), DUPLICATE_PLAY_REASON);
       if (rows.length > 0) {
         rows.sort((a, b) => a.playedAt.getTime() - b.playedAt.getTime());
         const scrobbleItems = buildScrobbleItems(rows, { sanitize: session.sanitizeScrobble });
