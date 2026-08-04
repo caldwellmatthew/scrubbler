@@ -216,18 +216,24 @@ lastfmRouter.post('/scrobble', async (req, res, next) => {
       ? await lastfmClient.scrobble(items, session.sessionKey)
       : [];
     await markScrobbledWithSanitizeInfo(rows, items, results);
-    const ignored = results.flatMap((result, i) =>
-      result.accepted
-        ? []
-        : [{
-            id: String(rows[i].id),
-            artist: items[i].artist,
-            track: items[i].track,
-            reason: result.ignoredReason,
-          }],
-    );
+    // Reported per row rather than echoing the request, so ids that resolved to
+    // no row are absent from every list instead of counting as scrobbled
+    const scrobbledIds: string[] = [];
+    const ignored: { id: string; artist: string; track: string; reason: string | null }[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      if (results[i]?.accepted) {
+        scrobbledIds.push(String(rows[i].id));
+      } else {
+        ignored.push({
+          id: String(rows[i].id),
+          artist: items[i].artist,
+          track: items[i].track,
+          reason: results[i]?.ignoredReason ?? null,
+        });
+      }
+    }
     // ignored was rejected by Last.fm; skipped was never sent, and force overrides it
-    res.json({ ok: true, scrobbled: items.length - ignored.length, ignored, skipped });
+    res.json({ ok: true, scrobbled: scrobbledIds.length, scrobbledIds, ignored, skipped });
   } catch (err) {
     next(err);
   }
