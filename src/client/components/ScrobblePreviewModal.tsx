@@ -20,6 +20,7 @@ interface EditableRow {
   defaultAlbum: string;
   originalTrack: string;
   originalAlbum: string;
+  skipReason: string | null;
 }
 
 export function ScrobblePreviewModal({ ids, open, rescrobbleCount, onClose, onScrobbled }: ScrobblePreviewModalProps) {
@@ -45,6 +46,7 @@ export function ScrobblePreviewModal({ ids, open, rescrobbleCount, onClose, onSc
         defaultAlbum: item.album,
         originalTrack: item.originalTrack,
         originalAlbum: item.originalAlbum,
+        skipReason: item.skipReason,
       }));
       setRows(editableRows);
       const albums = preview.items.map((i: PreviewItem) => i.album);
@@ -128,6 +130,10 @@ export function ScrobblePreviewModal({ ids, open, rescrobbleCount, onClose, onSc
 
   if (!open) return null;
 
+  // Before the preview lands there is nothing to skip, so every id still counts
+  const skipCount = rows.filter((r) => r.skipReason).length;
+  const sendCount = rows.length > 0 ? rows.length - skipCount : ids.length;
+
   return (
     <div id="preview-modal" class="open" ref={backdropRef} onClick={onBackdropClick}>
       <div id="preview-box">
@@ -138,6 +144,12 @@ export function ScrobblePreviewModal({ ids, open, rescrobbleCount, onClose, onSc
               ? (ids.length === 1 ? 'This track has' : 'All of these tracks have')
               : `${rescrobbleCount} of these tracks have`
             } already been scrobbled. Delete the original {rescrobbleCount === 1 ? 'scrobble' : 'scrobbles'} on Last.fm first to avoid duplicates.
+          </p>
+        )}
+        {skipCount > 0 && (
+          <p class="rescrobble-note">
+            {skipCount === 1 ? '1 play repeats' : `${skipCount} plays repeat`} an earlier
+            listen and will be held back. You'll be asked whether to send {skipCount === 1 ? 'it' : 'them'} anyway.
           </p>
         )}
         <div id="preview-scroll">
@@ -153,9 +165,18 @@ export function ScrobblePreviewModal({ ids, open, rescrobbleCount, onClose, onSc
             <tbody>
               {rows.map((row, idx) => {
                 const changed = row.track !== row.originalTrack || row.album !== row.originalAlbum;
+                const cls = [changed ? 'preview-changed' : '', row.skipReason ? 'skipped' : '']
+                  .filter(Boolean).join(' ');
                 return (
-                  <tr key={row.id} class={changed ? 'preview-changed' : ''}>
-                    <td class="artist-cell">{new Date(row.playedAt).toLocaleString()}</td>
+                  <tr key={row.id} class={cls}>
+                    <td class="artist-cell">
+                      {row.skipReason ? (
+                        <span class="scrobble-badge skipped" title={`Held back — ${row.skipReason}`}>⊘</span>
+                      ) : (
+                        <span class="scrobble-badge-spacer" />
+                      )}
+                      {new Date(row.playedAt).toLocaleString()}
+                    </td>
                     <td class="artist-cell">{row.artist}</td>
                     <td>
                       <input
@@ -182,7 +203,9 @@ export function ScrobblePreviewModal({ ids, open, rescrobbleCount, onClose, onSc
         <div id="preview-actions">
           <button onClick={onClose}>Cancel</button>
           <button id="preview-confirm-btn" onClick={confirm}>
-            Scrobble {ids.length} track{ids.length === 1 ? '' : 's'}
+            {sendCount === 0
+              ? 'Scrobble anyway'
+              : `Scrobble ${sendCount} track${sendCount === 1 ? '' : 's'}`}
           </button>
         </div>
       </div>

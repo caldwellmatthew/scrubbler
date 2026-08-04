@@ -159,8 +159,14 @@ lastfmRouter.post('/preview', async (req, res, next) => {
       res.status(400).json({ error: 'ids must be a non-empty array' });
       return;
     }
-    const rows = await historyRepo.getByIds(ids, req.user!.spotifyUserId);
+    const { spotifyUserId } = req.user!;
+    const rows = await historyRepo.getByIds(ids, spotifyUserId);
     rows.sort((a, b) => a.playedAt.getTime() - b.playedAt.getTime());
+    // The same rule the scrobble route applies, so the preview counts what will
+    // actually be sent. Read-only: nothing is marked skipped until it is asked for.
+    const priorPlays = await historyRepo.getPriorSameTrackPlays(spotifyUserId, rows.map((r) => r.id));
+    const { duplicates } = partitionDuplicatePlays(rows, priorPlays);
+    const skipped = new Set(duplicates.map(({ row }) => String(row.id)));
     const items = rows.map((row) => ({
       id: row.id,
       playedAt: row.playedAt,
@@ -169,6 +175,7 @@ lastfmRouter.post('/preview', async (req, res, next) => {
       album: cleanName(row.albumName),
       originalTrack: row.name,
       originalAlbum: row.albumName,
+      skipReason: skipped.has(String(row.id)) ? DUPLICATE_PLAY_REASON : null,
     }));
     res.json({ items });
   } catch (err) {
