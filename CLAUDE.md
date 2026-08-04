@@ -109,7 +109,7 @@ npm run migrate       # Apply pending migrations
 
 The client is a Preact SPA built with Vite (`src/client/`).
 
-- **Config**: `vite.config.ts` (root), `tsconfig.client.json` (separate from server tsconfig)
+- **Config**: `vite.config.ts` (root), `src/client/tsconfig.json` (separate from the server tsconfig, and kept beside the source so editors find it)
 - **Entry**: `src/client/index.html` → `main.tsx` → `app.tsx`
 - **State**: All state lives in `App.tsx` via `useState`, passed as props (2-3 levels deep, no context)
 - **Components**: `Header`, `NowPlaying`, `HistoryTab`, `ScrobbleBar`, `ScrobblePreviewModal`, `LikedSyncTab`, `ExplorerTab`

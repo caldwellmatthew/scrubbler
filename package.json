@@ -13,7 +13,7 @@
     "start:server": "NODE_ENV=production node dist/server/index.js",
     "start:worker": "node dist/worker/index.js",
     "migrate": "ts-node --transpile-only src/scripts/migrate.ts",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.client.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/client",
     "test": "vitest run",
     "test:watch": "vitest"
   },
