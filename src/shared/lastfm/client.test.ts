@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseScrobbleResults } from './client';
 
 function scrobbleEntry(code: string, text = '') {
@@ -50,17 +50,17 @@ describe('parseScrobbleResults', () => {
     expect(result.ignoredReason).toContain('99');
   });
 
-  it('assumes accepted when the response shape is unrecognized', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      expect(parseScrobbleResults({}, 2)).toEqual([
-        { accepted: true, ignoredReason: null },
-        { accepted: true, ignoredReason: null },
-      ]);
-      expect(parseScrobbleResults({ scrobbles: { scrobble: [scrobbleEntry('0')] } }, 2)).toHaveLength(2);
-      expect(warn).toHaveBeenCalled();
-    } finally {
-      warn.mockRestore();
-    }
+  it('refuses to guess when the response shape is unrecognized', () => {
+    expect(() => parseScrobbleResults({}, 2)).toThrow(/unclear what was recorded/i);
+  });
+
+  it('refuses to guess when the response covers fewer tracks than were sent', () => {
+    const data = { scrobbles: { scrobble: [scrobbleEntry('0')] } };
+    expect(() => parseScrobbleResults(data, 2)).toThrow(/1 scrobble results for 2/);
+  });
+
+  it('refuses to guess when the response covers more tracks than were sent', () => {
+    const data = { scrobbles: { scrobble: [scrobbleEntry('0'), scrobbleEntry('0')] } };
+    expect(() => parseScrobbleResults(data, 1)).toThrow(/2 scrobble results for 1/);
   });
 });
