@@ -1,10 +1,10 @@
-import type { ListenHistoryRow, PriorPlay } from '../types';
+import type { ListenHistoryRow, ListenHistoryRowWithPrior, PriorPlay } from '../types';
 import type { ScrobbleItem, ScrobbleResult } from './client';
 import { cleanName } from './clean';
 import * as historyRepo from '../repositories/historyRepo';
 
 export interface DuplicatePlay {
-  row: ListenHistoryRow;
+  row: ListenHistoryRowWithPrior;
   priorPlayedAt: Date;
 }
 
@@ -29,28 +29,26 @@ export const DUPLICATE_PLAY_REASON = 'Repeat of an earlier play of the same trac
  * Last.fm at all cannot stand in for this one, or a real listen would end up
  * with no scrobble.
  *
- * `priorPlays` maps a row id to the nearest earlier play of the same track, as
- * returned by historyRepo.getPriorSameTrackPlays.
+ * Each row carries its own nearest earlier play, fetched alongside it.
  */
 export function partitionDuplicatePlays(
-  rows: ListenHistoryRow[],
-  priorPlays: Map<string, PriorPlay>,
-): { kept: ListenHistoryRow[]; duplicates: DuplicatePlay[] } {
-  const kept: ListenHistoryRow[] = [];
+  rows: ListenHistoryRowWithPrior[],
+): { kept: ListenHistoryRowWithPrior[]; duplicates: DuplicatePlay[] } {
+  const kept: ListenHistoryRowWithPrior[] = [];
   const duplicates: DuplicatePlay[] = [];
   // Plays decided earlier in this batch, which the stored prior does not know about
   const decidedByTrack = new Map<string, PriorPlay>();
 
   const chronological = [...rows].sort((a, b) => a.playedAt.getTime() - b.playedAt.getTime());
   for (const row of chronological) {
-    const stored = priorPlays.get(String(row.id));
+    const stored = row.prior;
     const decided = decidedByTrack.get(row.spotifyTrackId);
     // Whichever prior play is nearer is the one this play could be repeating
     const prior = stored && decided
       ? (stored.playedAt > decided.playedAt ? stored : decided)
       : stored ?? decided;
 
-    const repeatsCoveredListen = prior !== undefined
+    const repeatsCoveredListen = prior != null
       && prior.covered
       && row.playedAt.getTime() - prior.playedAt.getTime() < row.durationMs;
 

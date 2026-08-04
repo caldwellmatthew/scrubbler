@@ -55,6 +55,17 @@ export interface PriorPlay {
   covered: boolean;
 }
 
+/**
+ * A play carrying the nearest earlier play of the same track, which is what
+ * deciding whether it repeats an already-accounted-for listen needs. Fetched
+ * with the row so both are read from one snapshot: `covered` is written by the
+ * scrobble paths, and the worker and a manual scrobble can run at once.
+ */
+export interface ListenHistoryRowWithPrior extends ListenHistoryRow {
+  /** Null when no earlier play of this track exists. */
+  prior: PriorPlay | null;
+}
+
 export interface LastfmSession {
   id: number;
   username: string;
