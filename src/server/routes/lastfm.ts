@@ -165,8 +165,7 @@ lastfmRouter.post('/preview', async (req, res, next) => {
     rows.sort((a, b) => a.playedAt.getTime() - b.playedAt.getTime());
     // The same rule the scrobble route applies, so the preview counts what will
     // actually be sent. Read-only: nothing is marked skipped until it is asked for.
-    const priorPlays = await historyRepo.getPriorSameTrackPlays(spotifyUserId, rows.map((r) => r.id));
-    const { duplicates } = partitionDuplicatePlays(rows, priorPlays);
+    const { duplicates } = partitionDuplicatePlays(rows);
     const skipped = new Set(duplicates.map(({ row }) => String(row.id)));
     const items = rows.map((row) => ({
       id: row.id,
@@ -207,14 +206,11 @@ lastfmRouter.post('/scrobble', async (req, res, next) => {
     }
     const candidates = await historyRepo.getByIds(ids, spotifyUserId);
     // force submits everything asked for, so a misjudged duplicate stays recoverable.
-    // Partitioning is skipped outright: an empty prior map still collapses a run
-    // within the batch, which would withhold plays the user just asked to send.
+    // Partitioning is skipped outright: it collapses a run within the batch too,
+    // which would withhold plays the user just asked to send.
     const { kept: rows, duplicates } = force
       ? { kept: candidates, duplicates: [] as DuplicatePlay[] }
-      : partitionDuplicatePlays(
-          candidates,
-          await historyRepo.getPriorSameTrackPlays(spotifyUserId, candidates.map(r => r.id)),
-        );
+      : partitionDuplicatePlays(candidates);
     const skipped = duplicates.map(({ row }) => ({
       id: String(row.id),
       artist: row.artistNames[0],

@@ -1,6 +1,6 @@
 import { getPool } from '../db';
 import type { PoolClient } from 'pg';
-import type { HistoryQueryParams, ListenEvent, ListenHistoryRow, PollState, PriorPlay } from '../types';
+import type { HistoryQueryParams, ListenEvent, ListenHistoryRow, ListenHistoryRowWithPrior, PollState } from '../types';
 
 export async function getPollState(spotifyUserId: string): Promise<PollState> {
   const pool = getPool();
@@ -145,7 +145,42 @@ function mapRow(row: Record<string, unknown>): ListenHistoryRow {
   };
 }
 
-export async function getByIds(ids: string[], spotifyUserId: string): Promise<ListenHistoryRow[]> {
+/** For the queries that also select PRIOR_PLAY_COLUMNS. */
+function mapRowWithPrior(row: Record<string, unknown>): ListenHistoryRowWithPrior {
+  return {
+    ...mapRow(row),
+    prior: row.prior_played_at
+      ? { playedAt: row.prior_played_at as Date, covered: row.prior_covered as boolean }
+      : null,
+  };
+}
+
+/**
+ * Joins each play to the nearest earlier play of the same track by the same
+ * user, and to whether that play's listen is already accounted for — scrobbled,
+ * or skipped for repeating something that was. Deciding whether a play is a
+ * repeat needs both, so they are selected together rather than looked up after.
+ *
+ * Deliberately unfiltered by scrobble state: a *covered* prior is the whole
+ * point, so this cannot narrow to unscrobbled rows the way its callers do.
+ */
+const PRIOR_PLAY_JOIN = `
+     LEFT JOIN LATERAL (
+          SELECT p.played_at, p.scrobbled_at, p.scrobble_skipped_reason
+            FROM listen_history p
+           WHERE p.spotify_user_id = lh.spotify_user_id
+             AND p.spotify_track_id = lh.spotify_track_id
+             AND p.played_at < lh.played_at
+           ORDER BY p.played_at DESC
+           LIMIT 1
+     ) prior ON true`;
+
+const PRIOR_PLAY_COLUMNS = `
+       prior.played_at AS prior_played_at,
+       (prior.scrobbled_at IS NOT NULL
+        OR prior.scrobble_skipped_reason IS NOT NULL) AS prior_covered`;
+
+export async function getByIds(ids: string[], spotifyUserId: string): Promise<ListenHistoryRowWithPrior[]> {
   if (ids.length === 0) return [];
   const pool = getPool();
   const result = await pool.query(
@@ -163,70 +198,35 @@ export async function getByIds(ids: string[], spotifyUserId: string): Promise<Li
        t.duration_ms,
        t.external_url,
        t.preview_url,
-       t.image_url
+       t.image_url,
+       ${PRIOR_PLAY_COLUMNS}
      FROM listen_history lh
      JOIN tracks t ON t.spotify_track_id = lh.spotify_track_id
+     ${PRIOR_PLAY_JOIN}
      WHERE lh.id = ANY($1) AND lh.spotify_user_id = $2`,
     [ids, spotifyUserId],
   );
-  return result.rows.map(mapRow);
+  return result.rows.map(mapRowWithPrior);
 }
 
-export async function getUnscrobbledByPlayedAts(spotifyUserId: string, playedAts: Date[]): Promise<ListenHistoryRow[]> {
+export async function getUnscrobbledByPlayedAts(
+  spotifyUserId: string,
+  playedAts: Date[],
+): Promise<ListenHistoryRowWithPrior[]> {
   if (playedAts.length === 0) return [];
   const pool = getPool();
   const result = await pool.query(
     `SELECT lh.id, lh.spotify_track_id, lh.spotify_user_id, lh.played_at, lh.scrobbled_at, lh.scrobble_sanitized, lh.scrobble_skipped_reason,
             t.name, t.artist_names, t.album_name, t.duration_ms,
-            t.external_url, t.preview_url, t.image_url
+            t.external_url, t.preview_url, t.image_url,
+            ${PRIOR_PLAY_COLUMNS}
      FROM listen_history lh
      JOIN tracks t ON t.spotify_track_id = lh.spotify_track_id
+     ${PRIOR_PLAY_JOIN}
      WHERE lh.spotify_user_id = $1 AND lh.played_at = ANY($2) AND lh.scrobbled_at IS NULL`,
     [spotifyUserId, playedAts],
   );
-  return result.rows.map(mapRow);
-}
-
-/**
- * For each given play, the nearest earlier play of the same track by the same
- * user, along with whether that earlier play's listen is already accounted for.
- * A play counts as covered once it has been scrobbled, or skipped for repeating
- * something that was. Plays with no earlier play of that track are absent from
- * the map. Keyed by listen_history id.
- */
-export async function getPriorSameTrackPlays(
-  spotifyUserId: string,
-  ids: string[],
-): Promise<Map<string, PriorPlay>> {
-  if (ids.length === 0) return new Map();
-  const pool = getPool();
-  const result = await pool.query(
-    `SELECT lh.id, prior.played_at AS prior_played_at,
-            (prior.scrobbled_at IS NOT NULL
-             OR prior.scrobble_skipped_reason IS NOT NULL) AS prior_covered
-       FROM listen_history lh
-       LEFT JOIN LATERAL (
-            SELECT p.played_at, p.scrobbled_at, p.scrobble_skipped_reason
-              FROM listen_history p
-             WHERE p.spotify_user_id = lh.spotify_user_id
-               AND p.spotify_track_id = lh.spotify_track_id
-               AND p.played_at < lh.played_at
-             ORDER BY p.played_at DESC
-             LIMIT 1
-       ) prior ON true
-      WHERE lh.id = ANY($1) AND lh.spotify_user_id = $2`,
-    [ids, spotifyUserId],
-  );
-  const priors = new Map<string, PriorPlay>();
-  for (const row of result.rows) {
-    if (row.prior_played_at) {
-      priors.set(String(row.id), {
-        playedAt: row.prior_played_at as Date,
-        covered: row.prior_covered as boolean,
-      });
-    }
-  }
-  return priors;
+  return result.rows.map(mapRowWithPrior);
 }
 
 /** Record why plays were deliberately not sent to Last.fm. */

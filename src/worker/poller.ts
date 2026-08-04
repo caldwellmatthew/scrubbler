@@ -91,8 +91,7 @@ async function pollUser(token: OAuthToken): Promise<void> {
   if (session?.autoScrobbleEnabled && events.length > 0) {
     try {
       const candidates = await historyRepo.getUnscrobbledByPlayedAts(spotifyUserId, events.map(e => e.playedAt));
-      const priorPlays = await historyRepo.getPriorSameTrackPlays(spotifyUserId, candidates.map(r => r.id));
-      const { kept: rows, duplicates } = partitionDuplicatePlays(candidates, priorPlays);
+      const { kept: rows, duplicates } = partitionDuplicatePlays(candidates);
       duplicates.forEach(({ row, priorPlayedAt }) => {
         console.log(
           `[worker] ${tag} Skipping "${row.name}" by ${row.artistNames[0]} — repeat of the play at ` +
