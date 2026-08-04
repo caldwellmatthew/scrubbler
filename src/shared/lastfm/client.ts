@@ -36,16 +36,24 @@ const IGNORED_REASONS: Record<string, string> = {
  * Parse a track.scrobble response body into per-item results, in submission
  * order. Last.fm reports ignored scrobbles inside an HTTP 200 response, so
  * "no error field" does not mean "accepted".
+ *
+ * Throws if the response cannot be lined up with the submission. Entries are
+ * positional, so a differing count leaves no way to tell which item any of them
+ * describes, and the outcome is genuinely unknown: the request itself succeeded,
+ * so the scrobbles may or may not have been recorded. Assuming acceptance would
+ * mark plays as scrobbled that may never have reached Last.fm, which loses them
+ * for good — nothing retries a play once it is marked. Callers must let this
+ * propagate rather than record an outcome they do not have.
  */
 export function parseScrobbleResults(data: unknown, itemCount: number): ScrobbleResult[] {
   const scrobbles = (data as { scrobbles?: { scrobble?: unknown } })?.scrobbles?.scrobble;
   // Single-item responses come back as a bare object rather than an array
   const entries = Array.isArray(scrobbles) ? scrobbles : scrobbles !== undefined ? [scrobbles] : [];
   if (entries.length !== itemCount) {
-    console.warn(
-      `[lastfm] Unexpected scrobble response shape (${entries.length} entries for ${itemCount} items) — assuming all accepted`,
+    throw new Error(
+      `Last.fm returned ${entries.length} scrobble results for ${itemCount} submitted tracks, ` +
+      'so it is unclear what was recorded — check Last.fm before resubmitting',
     );
-    return Array.from({ length: itemCount }, () => ({ accepted: true, ignoredReason: null }));
   }
   return entries.map((entry) => {
     const msg = (entry as { ignoredMessage?: { code?: string; '#text'?: string } })?.ignoredMessage;
