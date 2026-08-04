@@ -40,6 +40,8 @@ export interface PreviewItem {
   album: string;
   originalTrack: string;
   originalAlbum: string;
+  /** Why this play would be withheld, or null if it will be sent */
+  skipReason: string | null;
 }
 
 export interface AuthStatus {
