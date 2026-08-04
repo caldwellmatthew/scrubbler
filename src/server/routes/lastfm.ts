@@ -8,6 +8,7 @@ import * as tokenRepo from '../../shared/repositories/tokenRepo';
 import { fetchCurrentlyPlaying } from '../../shared/spotify/client';
 import { cleanName } from '../../shared/lastfm/clean';
 import { buildScrobbleItems, markScrobbledWithSanitizeInfo, buildNowPlayingPayload, partitionDuplicatePlays, DUPLICATE_PLAY_REASON } from '../../shared/lastfm/scrobble';
+import type { DuplicatePlay } from '../../shared/lastfm/scrobble';
 
 export const lastfmRouter = Router();
 
@@ -205,11 +206,15 @@ lastfmRouter.post('/scrobble', async (req, res, next) => {
       return;
     }
     const candidates = await historyRepo.getByIds(ids, spotifyUserId);
-    // force submits everything asked for, so a misjudged duplicate stays recoverable
-    const priorPlays = force
-      ? new Map()
-      : await historyRepo.getPriorSameTrackPlays(spotifyUserId, candidates.map(r => r.id));
-    const { kept: rows, duplicates } = partitionDuplicatePlays(candidates, priorPlays);
+    // force submits everything asked for, so a misjudged duplicate stays recoverable.
+    // Partitioning is skipped outright: an empty prior map still collapses a run
+    // within the batch, which would withhold plays the user just asked to send.
+    const { kept: rows, duplicates } = force
+      ? { kept: candidates, duplicates: [] as DuplicatePlay[] }
+      : partitionDuplicatePlays(
+          candidates,
+          await historyRepo.getPriorSameTrackPlays(spotifyUserId, candidates.map(r => r.id)),
+        );
     const skipped = duplicates.map(({ row }) => ({
       id: String(row.id),
       artist: row.artistNames[0],
