@@ -127,7 +127,15 @@ export async function submitScrobble(
   ids: string[],
   overrides: Record<string, { track: string; album: string }>,
   force = false,
-): Promise<{ ok: boolean; scrobbled?: number; ignored?: IgnoredScrobble[]; skipped?: SkippedScrobble[]; error?: string }> {
+): Promise<{
+  ok: boolean;
+  scrobbled?: number;
+  /** Ids Last.fm accepted — authoritative, unlike the requested ids */
+  scrobbledIds?: string[];
+  ignored?: IgnoredScrobble[];
+  skipped?: SkippedScrobble[];
+  error?: string;
+}> {
   return post('/lastfm/scrobble', { ids, overrides, force });
 }
 

@@ -82,14 +82,12 @@ export function ScrobblePreviewModal({ ids, open, rescrobbleCount, onClose, onSc
     );
     if (!proceed) return [];
 
-    const forcedIds = skipped.map((s) => s.id);
-    const forced = await api.submitScrobble(forcedIds, overrides, true);
+    const forced = await api.submitScrobble(skipped.map((s) => s.id), overrides, true);
     if (!forced.ok) {
       alert('Scrobble failed: ' + (forced.error || 'Unknown error'));
       return [];
     }
-    const rejected = new Set((forced.ignored ?? []).map((s) => s.id));
-    return forcedIds.filter((id) => !rejected.has(id));
+    return forced.scrobbledIds ?? [];
   }
 
   async function confirm() {
@@ -108,12 +106,12 @@ export function ScrobblePreviewModal({ ids, open, rescrobbleCount, onClose, onSc
       }
       const ignored = result.ignored ?? [];
       const skipped = result.skipped ?? [];
-      const scrobbledIds = new Set(ids);
-      for (const s of [...ignored, ...skipped]) scrobbledIds.delete(s.id);
+      const scrobbledIds = new Set(result.scrobbledIds ?? []);
 
       if (ignored.length > 0) {
         const lines = ignored.map((s) => `"${s.track}" by ${s.artist} — ${s.reason || 'no reason given'}`);
-        alert(`Last.fm ignored ${ignored.length} of ${ids.length} scrobbles:\n\n${lines.join('\n')}`);
+        const sent = scrobbledIds.size + ignored.length;
+        alert(`Last.fm ignored ${ignored.length} of ${sent} scrobbles:\n\n${lines.join('\n')}`);
       }
       if (skipped.length > 0) {
         for (const id of await confirmForced(skipped, overrides)) scrobbledIds.add(id);
