@@ -96,6 +96,28 @@ describe('cleanName', () => {
     });
   });
 
+  describe('subtitles before trailing metadata', () => {
+    it('strips only the metadata segment, keeping the subtitle', () => {
+      expect(cleanName('A Love Supreme, Pt. I – Acknowledgement - Live')).toBe(
+        'A Love Supreme, Pt. I – Acknowledgement',
+      );
+    });
+
+    it('keeps a subtitle that is not metadata', () => {
+      expect(cleanName('Song - Acknowledgement')).toBe('Song - Acknowledgement');
+    });
+
+    it('strips consecutive metadata segments back to the subtitle', () => {
+      expect(cleanName('Song - Acknowledgement - Live - Remastered 2011')).toBe(
+        'Song - Acknowledgement',
+      );
+    });
+
+    it('stops at the first non-metadata segment from the end', () => {
+      expect(cleanName('Song - Live - Acknowledgement')).toBe('Song - Live - Acknowledgement');
+    });
+  });
+
   describe('multiple metadata markers', () => {
     it('strips both parenthetical and bracketed metadata', () => {
       expect(cleanName('Song (Remastered) [Bonus Track]')).toBe('Song');
