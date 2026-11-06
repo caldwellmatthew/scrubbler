@@ -52,6 +52,8 @@ open http://localhost:5173/auth/login
 | `LASTFM_API_KEY` | No | From Last.fm API account (enables scrobbling) |
 | `LASTFM_API_SECRET` | No | From Last.fm API account |
 | `CLIENT_ORIGIN` | No | Origin of the client app for post-auth redirects. Set to `http://localhost:5173` in development. Leave empty in production. |
+| `TRUST_PROXY` | No | Express `trust proxy` value (hop count, `true`, or addresses/subnets). Set when behind a TLS-terminating reverse proxy so OAuth redirect URIs use its scheme and host. |
+| `POSTGRES_PASSWORD` | No | Database password used by `docker-compose.yml` (default: `spotifypass`). Only takes effect when the Postgres volume is first created. |
 
 ## API Endpoints
 
