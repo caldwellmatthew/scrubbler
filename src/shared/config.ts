@@ -14,6 +14,13 @@ function optionalEnv(name: string, defaultValue: string): string {
   return process.env[name] ?? defaultValue;
 }
 
+// Express `trust proxy` value: a hop count, a boolean, or addresses/subnets to trust
+function parseTrustProxy(value: string | undefined): boolean | number | string {
+  if (!value) return false;
+  if (value === 'true' || value === 'false') return value === 'true';
+  return /^\d+$/.test(value) ? parseInt(value, 10) : value;
+}
+
 const lastfmEnabled = !!(process.env['LASTFM_API_KEY'] && process.env['LASTFM_API_SECRET']);
 
 export const config = {
@@ -28,4 +35,5 @@ export const config = {
   lastfmApiSecret: optionalEnv('LASTFM_API_SECRET', ''),
   lastfmEnabled,
   clientOrigin: optionalEnv('CLIENT_ORIGIN', ''),
+  trustProxy: parseTrustProxy(process.env['TRUST_PROXY']),
 };

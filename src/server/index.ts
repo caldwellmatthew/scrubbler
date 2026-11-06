@@ -15,6 +15,9 @@ import { checkConnection, dbErrorMessage } from '../shared/db';
 
 const app = express();
 
+// OAuth redirect URIs are built from req.protocol/host, which need X-Forwarded-* behind a proxy
+app.set('trust proxy', config.trustProxy);
+
 app.use(express.json());
 app.use(cookieParser(config.oauthStateSecret));
 

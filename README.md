@@ -66,6 +66,8 @@ Then navigate to the web UI at http://localhost:5173/ to authenticate.
 | `PORT` | No | HTTP server port (default: `3000`) |
 | `POLL_INTERVAL_MS` | No | Polling interval in ms (default: `60000`) |
 | `CLIENT_ORIGIN` | No | Origin of the client app for post-auth redirects. Set to `http://localhost:5173` in development; leave empty in production. |
+| `TRUST_PROXY` | No | Express `trust proxy` value (hop count, `true`, or addresses/subnets). Set when behind a TLS-terminating reverse proxy so OAuth redirect URIs use its scheme and host. |
+| `POSTGRES_PASSWORD` | No | Database password used by `docker-compose.yml` (default: `spotifypass`). Only takes effect when the Postgres volume is first created. |
 | `NODE_ENV` | No | `development` or `production` |
 
 ## Tag Sanitization
