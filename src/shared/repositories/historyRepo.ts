@@ -45,8 +45,9 @@ export async function updatePollState(spotifyUserId: string, lastPlayedAtMs: num
   );
 }
 
-export async function insertMany(events: ListenEvent[], client?: PoolClient): Promise<number> {
-  if (events.length === 0) return 0;
+/** Insert plays not already stored, returning the ids of those that were new. */
+export async function insertMany(events: ListenEvent[], client?: PoolClient): Promise<string[]> {
+  if (events.length === 0) return [];
 
   const pool = client ?? getPool();
 
@@ -60,11 +61,12 @@ export async function insertMany(events: ListenEvent[], client?: PoolClient): Pr
   const result = await pool.query(
     `INSERT INTO listen_history (spotify_track_id, spotify_user_id, played_at)
      VALUES ${placeholders.join(', ')}
-     ON CONFLICT (spotify_user_id, spotify_track_id, played_at) DO NOTHING`,
+     ON CONFLICT (spotify_user_id, spotify_track_id, played_at) DO NOTHING
+     RETURNING id`,
     values,
   );
 
-  return result.rowCount ?? 0;
+  return result.rows.map((row) => String(row.id));
 }
 
 export async function queryHistory(params: HistoryQueryParams, spotifyUserId: string): Promise<ListenHistoryRow[]> {
@@ -205,26 +207,6 @@ export async function getByIds(ids: string[], spotifyUserId: string): Promise<Li
      ${PRIOR_PLAY_JOIN}
      WHERE lh.id = ANY($1) AND lh.spotify_user_id = $2`,
     [ids, spotifyUserId],
-  );
-  return result.rows.map(mapRowWithPrior);
-}
-
-export async function getUnscrobbledByPlayedAts(
-  spotifyUserId: string,
-  playedAts: Date[],
-): Promise<ListenHistoryRowWithPrior[]> {
-  if (playedAts.length === 0) return [];
-  const pool = getPool();
-  const result = await pool.query(
-    `SELECT lh.id, lh.spotify_track_id, lh.spotify_user_id, lh.played_at, lh.scrobbled_at, lh.scrobble_sanitized, lh.scrobble_skipped_reason,
-            t.name, t.artist_names, t.album_name, t.duration_ms,
-            t.external_url, t.preview_url, t.image_url,
-            ${PRIOR_PLAY_COLUMNS}
-     FROM listen_history lh
-     JOIN tracks t ON t.spotify_track_id = lh.spotify_track_id
-     ${PRIOR_PLAY_JOIN}
-     WHERE lh.spotify_user_id = $1 AND lh.played_at = ANY($2) AND lh.scrobbled_at IS NULL`,
-    [spotifyUserId, playedAts],
   );
   return result.rows.map(mapRowWithPrior);
 }

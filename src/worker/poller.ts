@@ -45,30 +45,21 @@ async function pollUser(token: OAuthToken): Promise<void> {
     return;
   }
 
-  // 2. Get cursor from poll_state
-  const cursor = pollState.lastPlayedAtMs;
+  // 2. Fetch the newest page; the unique constraint discards plays already stored
+  const items = (await fetchRecentlyPlayed(token)).items;
+  const previousNewestMs = pollState.lastPlayedAtMs;
 
-  // 3. Fetch from Spotify
-  console.log(`[worker] ${tag} Polling recently-played (after=${cursor ?? 'beginning'})`);
-  const response = await fetchRecentlyPlayed(token, cursor);
-  const items = response.items;
-
-  let events: ListenEvent[] = [];
-  if (items.length === 0) {
-    console.log(`[worker] ${tag} No new tracks since last poll`);
-    await historyRepo.updatePollState(spotifyUserId, null); // stamps last_polled_at, preserves cursor
-  } else {
-    // 4+5. Upsert tracks and insert events in a single transaction
+  let insertedIds: string[] = [];
+  if (items.length > 0) {
+    // 3. Upsert tracks and insert events in a single transaction
     const tracks = items.map(itemToTrack);
-    events = items.map((item) => itemToListenEvent(item, spotifyUserId));
-    const newestMs = new Date(items[0].played_at).getTime();
+    const events = items.map((item) => itemToListenEvent(item, spotifyUserId));
 
     const client = await getPool().connect();
-    let inserted = 0;
     try {
       await client.query('BEGIN');
       await trackRepo.upsertMany(tracks, client);
-      inserted = await historyRepo.insertMany(events, client);
+      insertedIds = await historyRepo.insertMany(events, client);
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');
@@ -77,20 +68,28 @@ async function pollUser(token: OAuthToken): Promise<void> {
       client.release();
     }
 
-    // 6. Advance cursor only after successful commit
-    await historyRepo.updatePollState(spotifyUserId, newestMs);
-
-    console.log(
-      `[worker] ${tag} Fetched ${items.length} items, inserted ${inserted} new events. ` +
-      `Cursor advanced to ${new Date(newestMs).toISOString()}`,
-    );
+    if (insertedIds.length > 0) {
+      // Anything newer than the previous newest is necessarily new; the rest arrived late
+      const fresh = previousNewestMs === null
+        ? insertedIds.length
+        : events.filter((e) => e.playedAt.getTime() > previousNewestMs).length;
+      const late = insertedIds.length - fresh;
+      console.log(
+        `[worker] ${tag} Inserted ${insertedIds.length} new plays` +
+        (late > 0 ? `, ${late} of them older than plays already stored` : ''),
+      );
+    }
   }
 
-  // 7. Auto-scrobble if enabled
+  // 4. Record the newest play seen, kept for reference only — fetching no longer reads it
+  const newestMs = items.length > 0 ? new Date(items[0].played_at).getTime() : null;
+  await historyRepo.updatePollState(spotifyUserId, newestMs);
+
+  // 5. Auto-scrobble the plays this poll added, if enabled
   const session = await lastfmRepo.getSession(spotifyUserId);
-  if (session?.autoScrobbleEnabled && events.length > 0) {
+  if (session?.autoScrobbleEnabled && insertedIds.length > 0) {
     try {
-      const candidates = await historyRepo.getUnscrobbledByPlayedAts(spotifyUserId, events.map(e => e.playedAt));
+      const candidates = await historyRepo.getByIds(insertedIds, spotifyUserId);
       const { kept: rows, duplicates } = partitionDuplicatePlays(candidates);
       duplicates.forEach(({ row, priorPlayedAt }) => {
         console.log(
@@ -121,7 +120,7 @@ async function pollUser(token: OAuthToken): Promise<void> {
     }
   }
 
-  // 8. Update Last.fm now playing if enabled (independent of auto-scrobble)
+  // 6. Update Last.fm now playing if enabled (independent of auto-scrobble)
   if (session?.nowPlayingEnabled) {
     try {
       const nowPlaying = await fetchCurrentlyPlaying(token);

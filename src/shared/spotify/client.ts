@@ -42,16 +42,12 @@ export async function getValidToken(token: OAuthToken): Promise<string> {
   return refreshed.accessToken;
 }
 
-export async function fetchRecentlyPlayed(
-  token: OAuthToken,
-  afterMs: number | null,
-): Promise<SpotifyRecentlyPlayedResponse> {
+// Always the newest page, never `after`: Spotify can record a play well after it happened,
+// stamped with its real time, so a cursor would already be past it.
+export async function fetchRecentlyPlayed(token: OAuthToken): Promise<SpotifyRecentlyPlayedResponse> {
   const accessToken = await getValidToken(token);
 
-  const params: Record<string, string | number> = { limit: 50 };
-  if (afterMs !== null) {
-    params.after = afterMs;
-  }
+  const params = { limit: 50 };
 
   const response = await axios.get<SpotifyRecentlyPlayedResponse>(
     `${SPOTIFY_API_BASE}/me/player/recently-played`,

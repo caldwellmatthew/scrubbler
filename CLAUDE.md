@@ -126,7 +126,7 @@ In development, the Vite dev server (port 5173) proxies all API routes to the Ex
 - **`oauth_tokens`** — one row per authenticated Spotify user
 - **`tracks`** — normalized track metadata (upserted to keep fresh)
 - **`listen_history`** — one row per play event; `UNIQUE(spotify_track_id, played_at)` deduplicates; `scrobbled_at` tracks Last.fm scrobble time; `scrobble_skipped_reason` records why a play was deliberately withheld
-- **`poll_state`** — single-row cursor table; `last_played_at_ms` is the `after` param for the next poll
+- **`poll_state`** — per-user poll toggle and bookkeeping; `last_played_at_ms` records the newest play seen, but polling doesn't read it (see below)
 - **`lastfm_sessions`** — Last.fm session key and per-user toggles (`auto_scrobble_enabled`, `now_playing_enabled`, `sanitize_now_playing`)
 - **`lastfm_loved_matches`** — mirror of a user's Last.fm loved tracks plus the Spotify track each resolved to; doubles as the resolution cache so re-scans skip resolved rows and remember rejections
 - **`schema_migrations`** — one row per applied migration file, with the file's checksum; maintained by `npm run migrate`
@@ -148,6 +148,12 @@ only rarely. Two things follow, and the scrobble rules depend on both:
 
 Spotify also logs plays lasting only a second or two, so there is no minimum
 listening time to rely on before a play appears.
+
+Plays can also appear in recently-played **late**: hours after they happened, stamped
+with their real time and so older than plays already fetched. An `after` cursor would
+already be past them, so the worker always fetches the newest page and relies on the
+unique constraint to discard what it has stored. Paging back further wouldn't help;
+the endpoint only keeps the most recent 50 plays.
 
 ## Migrations
 
