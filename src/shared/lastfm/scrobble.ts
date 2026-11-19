@@ -1,6 +1,6 @@
 import type { ListenHistoryRow, ListenHistoryRowWithPrior, PriorPlay } from '../types';
 import type { ScrobbleItem, ScrobbleResult } from './client';
-import { cleanName } from './clean';
+import { cleanAlbumName, cleanName } from './clean';
 import * as historyRepo from '../repositories/historyRepo';
 
 export interface DuplicatePlay {
@@ -78,7 +78,7 @@ export function buildScrobbleItems(
   return rows.map((row) => ({
     artist: row.artistNames[0],
     track: overrides?.[String(row.id)]?.track ?? (sanitize ? cleanName(row.name) : row.name),
-    album: overrides?.[String(row.id)]?.album ?? (sanitize ? cleanName(row.albumName) : row.albumName),
+    album: overrides?.[String(row.id)]?.album ?? (sanitize ? cleanAlbumName(row.albumName) : row.albumName),
     timestamp: Math.floor(row.playedAt.getTime() / 1000),
     duration: Math.floor(row.durationMs / 1000),
   }));
@@ -120,7 +120,7 @@ export function buildNowPlayingPayload(
   return {
     artist: track.artists[0].name,
     track: sanitize ? cleanName(track.name) : track.name,
-    album: sanitize ? cleanName(track.album.name) : track.album.name,
+    album: sanitize ? cleanAlbumName(track.album.name) : track.album.name,
     duration: Math.floor(track.duration_ms / 1000),
   };
 }

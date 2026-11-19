@@ -3,7 +3,7 @@ import * as tokenRepo from '../../shared/repositories/tokenRepo';
 import * as lastfmRepo from '../../shared/repositories/lastfmRepo';
 import * as lastfmClient from '../../shared/lastfm/client';
 import { fetchCurrentlyPlaying } from '../../shared/spotify/client';
-import { cleanName } from '../../shared/lastfm/clean';
+import { cleanAlbumName, cleanName } from '../../shared/lastfm/clean';
 import { buildNowPlayingPayload } from '../../shared/lastfm/scrobble';
 
 export const nowPlayingRouter = Router();
@@ -27,7 +27,7 @@ nowPlayingRouter.get('/', async (req, res, next) => {
         artistName: t.artists.map(a => a.name).join(', '),
         albumName: t.album.name,
         cleanedName: cleanName(t.name),
-        cleanedAlbumName: cleanName(t.album.name),
+        cleanedAlbumName: cleanAlbumName(t.album.name),
         durationMs: t.duration_ms,
         imageUrl: t.album.images[0]?.url ?? null,
         externalUrl: t.external_urls.spotify,

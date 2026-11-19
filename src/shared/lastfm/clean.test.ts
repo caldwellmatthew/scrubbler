@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanName } from './clean';
+import { cleanAlbumName, cleanName } from './clean';
 
 describe('cleanName', () => {
   describe('pass-throughs', () => {
@@ -138,5 +138,28 @@ describe('cleanName', () => {
     it('trims trailing whitespace after removing metadata', () => {
       expect(cleanName('Song (Remastered)   ')).toBe('Song');
     });
+  });
+});
+
+describe('cleanAlbumName', () => {
+  it('keeps a live marker, since a live album is a distinct release', () => {
+    expect(cleanAlbumName('Vespertine (Live)')).toBe('Vespertine (Live)');
+    expect(cleanAlbumName('Homogenic - Live')).toBe('Homogenic - Live');
+    expect(cleanAlbumName('Debut [Live at Royal Albert Hall]')).toBe('Debut [Live at Royal Albert Hall]');
+  });
+
+  it('strips edition markers', () => {
+    expect(cleanAlbumName('Homogenic (Remastered)')).toBe('Homogenic');
+    expect(cleanAlbumName('Post (Deluxe Edition)')).toBe('Post');
+    expect(cleanAlbumName('Debut - 30th Anniversary Edition')).toBe('Debut');
+  });
+
+  it('strips an edition marker from a live album without touching the live one', () => {
+    expect(cleanAlbumName('Vespertine (Live) [Remastered]')).toBe('Vespertine (Live)');
+  });
+
+  it('still lets the track cleaner strip live', () => {
+    expect(cleanName('Pluto - Live')).toBe('Pluto');
+    expect(cleanName('Vespertine (Live)')).toBe('Vespertine');
   });
 });

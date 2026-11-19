@@ -6,7 +6,7 @@ import * as lastfmRepo from '../../shared/repositories/lastfmRepo';
 import * as historyRepo from '../../shared/repositories/historyRepo';
 import * as tokenRepo from '../../shared/repositories/tokenRepo';
 import { fetchCurrentlyPlaying } from '../../shared/spotify/client';
-import { cleanName } from '../../shared/lastfm/clean';
+import { cleanAlbumName, cleanName } from '../../shared/lastfm/clean';
 import { buildScrobbleItems, markScrobbledWithSanitizeInfo, buildNowPlayingPayload, partitionDuplicatePlays, DUPLICATE_PLAY_REASON } from '../../shared/lastfm/scrobble';
 import type { DuplicatePlay } from '../../shared/lastfm/scrobble';
 
@@ -172,7 +172,7 @@ lastfmRouter.post('/preview', async (req, res, next) => {
       playedAt: row.playedAt,
       artist: row.artistNames[0],
       track: cleanName(row.name),
-      album: cleanName(row.albumName),
+      album: cleanAlbumName(row.albumName),
       originalTrack: row.name,
       originalAlbum: row.albumName,
       skipReason: skipped.has(String(row.id)) ? DUPLICATE_PLAY_REASON : null,
