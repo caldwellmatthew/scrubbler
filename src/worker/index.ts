@@ -1,6 +1,7 @@
 import { config } from '../shared/config';
 import { checkConnection, isDbConnectionError, dbErrorMessage } from '../shared/db';
 import { poll } from './poller';
+import { loggable } from '../shared/loggable';
 
 async function runPoll(): Promise<void> {
   try {
@@ -9,7 +10,7 @@ async function runPoll(): Promise<void> {
     if (isDbConnectionError(err)) {
       console.error('[worker] Database unavailable, will retry next interval:', dbErrorMessage(err));
     } else {
-      console.error('[worker] Poll failed:', err);
+      console.error('[worker] Poll failed:', loggable(err));
     }
   }
 }

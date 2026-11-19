@@ -6,6 +6,7 @@ import * as lastfmClient from '../shared/lastfm/client';
 import { buildScrobbleItems, markScrobbledWithSanitizeInfo, buildNowPlayingPayload, partitionDuplicatePlays, DUPLICATE_PLAY_REASON } from '../shared/lastfm/scrobble';
 import { fetchRecentlyPlayed, fetchCurrentlyPlaying } from '../shared/spotify/client';
 import { getPool } from '../shared/db';
+import { loggable } from '../shared/loggable';
 import type { ListenEvent, OAuthToken, Track } from '../shared/types';
 import type { SpotifyPlayHistoryItem } from '../shared/types';
 
@@ -116,7 +117,7 @@ async function pollUser(token: OAuthToken): Promise<void> {
         });
       }
     } catch (err) {
-      console.error(`[worker] ${tag} Auto-scrobble failed:`, err);
+      console.error(`[worker] ${tag} Auto-scrobble failed:`, loggable(err));
     }
   }
 
@@ -134,7 +135,7 @@ async function pollUser(token: OAuthToken): Promise<void> {
         console.log(`[worker] ${tag} Now playing: nothing (Spotify idle or no active device)`);
       }
     } catch (err) {
-      console.error(`[worker] ${tag} Now playing update failed:`, err);
+      console.error(`[worker] ${tag} Now playing update failed:`, loggable(err));
     }
   }
 }
@@ -150,7 +151,7 @@ export async function poll(): Promise<void> {
     try {
       await pollUser(token);
     } catch (err) {
-      console.error(`[worker] [user:${token.spotifyUserId}] Poll failed:`, err);
+      console.error(`[worker] [user:${token.spotifyUserId}] Poll failed:`, loggable(err));
     }
   }));
 }

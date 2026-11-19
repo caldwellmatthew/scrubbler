@@ -1,5 +1,6 @@
 import type { ErrorRequestHandler } from 'express';
 import { isDbConnectionError, dbErrorMessage } from '../../shared/db';
+import { loggable } from '../../shared/loggable';
 
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   if (isDbConnectionError(err)) {
@@ -12,7 +13,7 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   const message: string = err instanceof Error ? err.message : 'Internal server error';
 
   if (status >= 500) {
-    console.error('[server] Unhandled error:', err);
+    console.error('[server] Unhandled error:', loggable(err));
   }
 
   res.status(status).json({ error: message });
